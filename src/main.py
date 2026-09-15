@@ -84,7 +84,7 @@ def run_server_mode(agent: VoiceAgent, port: int = 8000):
 
 def main():
     parser = argparse.ArgumentParser(description="Kipps.AI Clone – AI Voice Agent (AICredits)")
-    parser.add_argument("--mode", choices=["mic", "text", "server", "gui"], default="text")
+    parser.add_argument("--mode", choices=["mic", "text", "server", "gui", "call"], default="text")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--config", default=os.getenv("AGENT_CONFIG_PATH", "config/agent_config.yaml"))
     args = parser.parse_args()
@@ -105,6 +105,11 @@ def main():
     if args.mode == "gui":
         from src.gui_app import main as gui_main
         gui_main()
+        return
+
+    if args.mode == "call":
+        from src.call_server import main as call_main
+        call_main()
         return
 
     agent = VoiceAgent(config_path=args.config)

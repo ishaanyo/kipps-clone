@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SecureLoan — Live Call</title>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --accent: #3b82f6;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --text: #e7ecf3;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .phone {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 28px 24px 32px;
+      box-shadow: 0 25px 50px rgba(0,0,0,.45);
+      border: 1px solid #334155;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 4px; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #0f172a;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .btns { display: flex; gap: 12px; }
+    button {
+      flex: 1;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: white;
+      transition: transform .1s, opacity .2s;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .start { background: var(--ok); }
+    .end { background: var(--danger); }
+    .log {
+      margin-top: 20px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 12px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <h1>SecureLoan Live Call</h1>
+    <p class="sub">Continuous voice · LiveKit + AICredits</p>
+
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Idle — press Start Call</span>
+    </div>
+
+    <div class="btns">
+      <button class="start" id="startBtn" onclick="startCall()">Start Call</button>
+      <button class="end" id="endBtn" onclick="endCall()" disabled>End Call</button>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const { Room, RoomEvent, Track, createLocalAudioTrack } = LivekitClient;
+
+    let room = null;
+    const logEl = document.getElementById('log');
+    const statusText = document.getElementById('statusText');
+    const dot = document.getElementById('dot');
+    const startBtn = document.getElementById('startBtn');
+    const endBtn = document.getElementById('endBtn');
+
+    function log(msg) {
+      const t = new Date().toLocaleTimeString();
+      logEl.textContent += '[' + t + '] ' + msg + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setLive(on, text) {
+      statusText.textContent = text;
+      dot.classList.toggle('live', on);
+      startBtn.disabled = on;
+      endBtn.disabled = !on;
+    }
+
+    async function startCall() {
+      try {
+        setLive(false, 'Connecting…');
+        log('Requesting token…');
+        const res = await fetch('/api/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        log('Joining room ' + data.room);
+
+        room = new Room({ adaptiveStream: true, dynacast: true });
+        room.on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === Track.Kind.Audio) {
+            const el = track.attach();
+            el.autoplay = true;
+            document.body.appendChild(el);
+            log('Agent audio connected');
+          }
+        });
+        room.on(RoomEvent.Disconnected, () => {
+          setLive(false, 'Call ended');
+          log('Disconnected');
+        });
+
+        await room.connect(data.url, data.token);
+        const mic = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true });
+        await room.localParticipant.publishTrack(mic);
+        setLive(true, 'In call — speak freely');
+        log('Connected. Speak to the agent.');
+      } catch (e) {
+        console.error(e);
+        log('Error: ' + e.message);
+        setLive(false, 'Failed — start agent worker + check .env');
+      }
+    }
+
+    async function endCall() {
+      if (room) {
+        await room.disconnect();
+        room = null;
+      }
+      setLive(false, 'Call ended');
+      log('You left the call.');
+    }
+  </script>
+</body>
+</html>

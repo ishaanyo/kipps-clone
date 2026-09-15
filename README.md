@@ -92,3 +92,38 @@ All traffic goes through `https://api.aicredits.in/v1` with your single key.
 ## License
 
 MIT (educational / internal use). Do not use the name "Kipps" commercially.
+
+
+## Phase 1 — Continuous call (LiveKit)
+
+### 1. Env
+
+```env
+LIVEKIT_URL=wss://....livekit.cloud
+LIVEKIT_API_KEY=API...
+LIVEKIT_API_SECRET=...
+AICREDITS_API_KEY=sk-...
+```
+
+### 2. Install
+
+```bash
+pip install "livekit-agents[openai,silero]" livekit-api livekit
+```
+
+### 3. Run two processes
+
+**Terminal A — agent worker**
+```bash
+python -m src.livekit_agent dev
+```
+
+**Terminal B — call UI**
+```bash
+python -m src.call_server
+# or: python -m src.main --mode call
+```
+
+Open **http://127.0.0.1:8080** → **Start Call** → speak → **End Call**  
+Lead is appended to `data/leads.jsonl` when the call ends.
+
