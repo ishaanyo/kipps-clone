@@ -3,6 +3,7 @@ SecureLoan Voice Agent – GUI (voice-to-voice call interface)
 
 Run:
     python -m src.gui_app
+    python -m src.main --mode gui
 """
 import os
 import sys
@@ -20,13 +21,37 @@ from loguru import logger
 
 from src.utils.logger import setup_logger
 from src.voice_agent import VoiceAgent
-from src.utils.audio import numpy_to_wav_bytes
 
 setup_logger(os.getenv("LOG_LEVEL", "INFO"))
 
-# Global agent session (one call at a time)
 agent: VoiceAgent | None = None
 call_active = False
+
+
+def _tts_to_file(text: str) -> str | None:
+    """Generate MP3 via AICredits and return file path for in-browser play (no ffmpeg)."""
+    if not agent or not text:
+        return None
+    try:
+        path = agent.tts.synthesize_to_file(text, suffix=".mp3")
+        return path if path else None
+    except Exception as e:
+        logger.error(f"TTS file error: {e}")
+        return None
+
+
+def _format_chat(messages) -> str:
+    lines = []
+    for m in messages:
+        role = m.get("role", "")
+        content = m.get("content") or ""
+        if role == "user":
+            lines.append(f"**You:** {content}")
+        elif role == "assistant" and content:
+            lines.append(f"**Agent:** {content}")
+        elif role == "tool" and content:
+            lines.append(f"*System:* {content}")
+    return "\n\n".join(lines) if lines else "_No messages yet_"
 
 
 def start_call():
@@ -50,16 +75,15 @@ def start_call():
     )
     agent.messages.append({"role": "assistant", "content": greeting})
     audio_path = _tts_to_file(greeting)
-    status = "🟢 Call connected — speak or type below"
     return (
         _format_chat(agent.messages),
-        status,
+        "🟢 Call connected — speak or type below",
         audio_path,
-        gr.update(interactive=True),   # mic
-        gr.update(interactive=True),   # text
-        gr.update(interactive=True),   # send
-        gr.update(interactive=False),  # start
-        gr.update(interactive=True),   # end
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=False),
+        gr.update(interactive=True),
     )
 
 
@@ -79,7 +103,7 @@ def end_call():
 
     try:
         agent._save_transcript()
-        saved = "✅ Call ended. Lead & transcript saved to data/leads.jsonl and logs/"
+        saved = "✅ Call ended. Lead & transcript saved to `data/leads.jsonl` and `logs/`"
     except Exception as e:
         saved = f"⚠️ Call ended but save failed: {e}"
         logger.error(e)
@@ -97,49 +121,9 @@ def end_call():
         gr.update(interactive=False),
         gr.update(interactive=False),
         gr.update(interactive=False),
-        gr.update(interactive=True),   # start
-        gr.update(interactive=False),  # end
+        gr.update(interactive=True),
+        gr.update(interactive=False),
     )
-
-
-def _tts_to_file(text: str) -> str | None:
-    if not agent:
-        return None
-    try:
-        audio = agent.tts.synthesize_to_numpy(text)
-        if len(audio) == 0:
-            # fallback: raw mp3 bytes
-            mp3 = agent.tts.synthesize(text)
-            if not mp3:
-                return None
-            fd, path = tempfile.mkstemp(suffix=".mp3")
-            os.close(fd)
-            with open(path, "wb") as f:
-                f.write(mp3)
-            return path
-        # write wav
-        import soundfile as sf
-        fd, path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)
-        sf.write(path, audio, 16000)
-        return path
-    except Exception as e:
-        logger.error(f"TTS file error: {e}")
-        return None
-
-
-def _format_chat(messages) -> str:
-    lines = []
-    for m in messages:
-        role = m.get("role", "")
-        content = m.get("content") or ""
-        if role == "user":
-            lines.append(f"**You:** {content}")
-        elif role == "assistant" and content:
-            lines.append(f"**Agent:** {content}")
-        elif role == "tool" and content:
-            lines.append(f"*System:* {content}")
-    return "\n\n".join(lines) if lines else "_No messages yet_"
 
 
 def process_text(user_text: str):
@@ -155,7 +139,6 @@ def process_text(user_text: str):
 
 
 def process_audio(audio):
-    """audio: (sample_rate, numpy array) from Gradio Microphone"""
     global agent
     if not call_active or agent is None:
         return _format_chat([]), "Start a call first", None
@@ -166,17 +149,17 @@ def process_audio(audio):
         sr, data = audio
         if data is None or len(data) == 0:
             return _format_chat(agent.messages), "Empty audio", None
-        # mono float32
         if data.ndim > 1:
             data = data.mean(axis=1)
         data = data.astype(np.float32)
-        if data.max() > 1.0 or data.min() < -1.0:
-            data = data / (np.max(np.abs(data)) + 1e-8)
-        # resample rough if needed (Whisper accepts various rates via wav)
+        peak = np.max(np.abs(data)) + 1e-8
+        if peak > 1.0:
+            data = data / peak
+
         import soundfile as sf
         fd, path = tempfile.mkstemp(suffix=".wav")
         os.close(fd)
-        sf.write(path, data, sr)
+        sf.write(path, data, int(sr))
         with open(path, "rb") as f:
             wav_bytes = f.read()
         try:
@@ -197,17 +180,11 @@ def process_audio(audio):
 
 
 def build_ui():
-    with gr.Blocks(
-        title="SecureLoan AI Voice Agent",
-        theme=gr.themes.Soft(primary_hue="blue"),
-        css="""
-        .status-box { font-size: 1.1em; padding: 12px; border-radius: 8px; }
-        """
-    ) as demo:
+    with gr.Blocks(title="SecureLoan AI Voice Agent") as demo:
         gr.Markdown(
             """
             # 📞 SecureLoan AI Voice Agent
-            Voice-to-voice call · End call to save lead automatically
+            Voice-to-voice call · Click **End Call** to save the lead automatically
             """
         )
 
@@ -215,28 +192,34 @@ def build_ui():
             value="🔴 No active call — click Start Call",
             label="Call status",
             interactive=False,
-            elem_classes=["status-box"],
         )
 
-        chatbot = gr.Markdown(value="_Start a call to begin_", label="Conversation")
+        chatbot = gr.Markdown(value="_Start a call to begin_")
 
-        agent_audio = gr.Audio(label="Agent speaking", autoplay=True, type="filepath")
+        # Autoplay in browser — no download button emphasis
+        agent_audio = gr.Audio(
+            label="Agent voice",
+            type="filepath",
+            autoplay=True,
+            interactive=False,
+            show_download_button=False,
+            waveform_options={"show_recording_waveform": False},
+        )
 
         with gr.Row():
-            start_btn = gr.Button("🟢 Start Call", variant="primary", scale=1)
-            end_btn = gr.Button("🔴 End Call", variant="stop", interactive=False, scale=1)
+            start_btn = gr.Button("🟢 Start Call", variant="primary")
+            end_btn = gr.Button("🔴 End Call", variant="stop", interactive=False)
 
         gr.Markdown("### Speak or type")
-        with gr.Row():
-            mic = gr.Audio(
-                sources=["microphone"],
-                type="numpy",
-                label="Hold / record then release to send",
-                interactive=False,
-            )
+        mic = gr.Audio(
+            sources=["microphone"],
+            type="numpy",
+            label="Microphone — record, then stop to send",
+            interactive=False,
+        )
         with gr.Row():
             text_in = gr.Textbox(
-                placeholder="Or type your message here…",
+                placeholder="Or type your message…",
                 label="Text message",
                 interactive=False,
                 scale=4,
@@ -244,7 +227,7 @@ def build_ui():
             send_btn = gr.Button("Send", interactive=False, scale=1)
 
         gr.Markdown(
-            "*After **End Call**, lead data is appended to `data/leads.jsonl` and transcript to `logs/`.*"
+            "After **End Call**, data is saved to `data/leads.jsonl` and `logs/`."
         )
 
         start_btn.click(
@@ -284,6 +267,7 @@ def main():
         server_port=7860,
         share=False,
         inbrowser=True,
+        theme=gr.themes.Soft(primary_hue="blue"),
     )
 
 

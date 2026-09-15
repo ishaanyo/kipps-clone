@@ -1,3 +1,4 @@
+import os
 """
 Text-to-Speech via AICredits.
 Uses POST /v1/audio/speech
@@ -61,3 +62,16 @@ class OpenAITTS:
         except Exception as e:
             logger.warning(f"Audio conversion failed (install pydub + ffmpeg): {e}")
             return np.array([])
+
+    def synthesize_to_file(self, text: str, suffix: str = ".mp3") -> str:
+        """Write TTS audio to a temp file and return path (for Gradio playback)."""
+        import tempfile
+        audio_bytes = self.synthesize(text)
+        if not audio_bytes:
+            return ""
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        try:
+            os.write(fd, audio_bytes)
+        finally:
+            os.close(fd)
+        return path
