@@ -245,7 +245,7 @@ class VoiceAgent:
     def _save_transcript(self):
         os.makedirs("logs", exist_ok=True)
         path = f"logs/transcript_{self.turn_count}.txt"
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(f"Department: {self.current_department or 'Not selected'}\n\n")
             for m in self.messages:
                 role = m.get("role", "unknown")
