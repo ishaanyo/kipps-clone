@@ -24,3 +24,8 @@ python-multipart>=0.0.9
 
 # GUI
 gradio>=4.44.0
+
+# LiveKit Phase 1
+livekit>=0.17.0
+livekit-api>=0.7.0
+livekit-agents[openai,silero]>=0.12.0
