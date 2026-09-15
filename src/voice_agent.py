@@ -169,6 +169,14 @@ class VoiceAgent:
         result = self.llm.chat(self.messages, system_prompt=system_prompt)
 
         if result["tool_calls"]:
+            # If transferring to a named department, update current_department
+            for tc in result["tool_calls"]:
+                if tc["name"] == "transfer_to_human":
+                    dept_arg = (tc.get("arguments") or {}).get("department") or ""
+                    detected = self.kb.detect_department(dept_arg) if dept_arg else None
+                    if detected:
+                        self.current_department = detected
+                        logger.info(f"Department set via transfer: {detected}")
             tool_results = self.llm.execute_tools(result["tool_calls"])
             self.messages.append({
                 "role": "assistant",
@@ -187,6 +195,7 @@ class VoiceAgent:
             })
             for tr in tool_results:
                 self.messages.append(tr)
+            system_prompt = self._build_system_prompt(user_text)
             result = self.llm.chat(self.messages, system_prompt=system_prompt)
 
         response_text = result["content"] or "Sorry, I couldn't generate a response."

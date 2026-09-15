@@ -19,12 +19,17 @@ class KnowledgeBase:
             "home loan": "home_loan",
             "home": "home_loan",
             "housing": "home_loan",
+            "property": "home_loan",
             "business loan": "business_loan",
             "business": "business_loan",
             "msme": "business_loan",
             "credit card": "credit_card",
             "card": "credit_card",
             "creditcard": "credit_card",
+            "gold loan": "gold_loan",
+            "gold": "gold_loan",
+            "jewellery loan": "gold_loan",
+            "jewelry loan": "gold_loan",
             "support": "customer_support",
             "customer support": "customer_support",
             "general": "customer_support",
@@ -57,7 +62,7 @@ class KnowledgeBase:
         if department is None:
             name = p.stem.lower()
             department = name if name in [
-                "personal_loan", "home_loan", "business_loan",
+                "personal_loan", "home_loan", "business_loan", "gold_loan",
                 "credit_card", "customer_support", "collections"
             ] else "general"
 
@@ -72,9 +77,12 @@ class KnowledgeBase:
             self.add_file(str(file))
 
     def detect_department(self, query: str) -> Optional[str]:
-        """Return department key from user query, or None."""
+        """Return department key from user query, or None.
+        Longer / more specific aliases are matched first.
+        """
         q = query.lower().strip()
-        for alias, dept in self.department_aliases.items():
+        # Sort aliases by length descending so "gold loan" beats "loan"/partials
+        for alias, dept in sorted(self.department_aliases.items(), key=lambda x: -len(x[0])):
             if alias in q:
                 return dept
         return None
@@ -90,6 +98,7 @@ class KnowledgeBase:
             "credit_card": "Credit Card",
             "customer_support": "Customer Support",
             "collections": "Collections / Recovery",
+            "gold_loan": "Gold Loan",
         }
         return mapping.get(key, key.replace("_", " ").title())
 
