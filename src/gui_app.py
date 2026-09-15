@@ -202,8 +202,6 @@ def build_ui():
             type="filepath",
             autoplay=True,
             interactive=False,
-            show_download_button=False,
-            waveform_options={"show_recording_waveform": False},
         )
 
         with gr.Row():
@@ -262,13 +260,17 @@ def main():
         print("Set AICREDITS_API_KEY in .env first")
         sys.exit(1)
     demo = build_ui()
-    demo.queue().launch(
+    launch_kwargs = dict(
         server_name="127.0.0.1",
         server_port=7860,
         share=False,
         inbrowser=True,
-        theme=gr.themes.Soft(primary_hue="blue"),
     )
+    try:
+        launch_kwargs["theme"] = gr.themes.Soft(primary_hue="blue")
+    except Exception:
+        pass
+    demo.queue().launch(**launch_kwargs)
 
 
 if __name__ == "__main__":
