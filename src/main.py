@@ -84,7 +84,7 @@ def run_server_mode(agent: VoiceAgent, port: int = 8000):
 
 def main():
     parser = argparse.ArgumentParser(description="Kipps.AI Clone – AI Voice Agent (AICredits)")
-    parser.add_argument("--mode", choices=["mic", "text", "server"], default="text")
+    parser.add_argument("--mode", choices=["mic", "text", "server", "gui"], default="text")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--config", default=os.getenv("AGENT_CONFIG_PATH", "config/agent_config.yaml"))
     args = parser.parse_args()
@@ -101,6 +101,11 @@ def main():
             "4. Put it in .env"
         )
         sys.exit(1)
+
+    if args.mode == "gui":
+        from src.gui_app import main as gui_main
+        gui_main()
+        return
 
     agent = VoiceAgent(config_path=args.config)
 
