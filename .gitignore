@@ -10,3 +10,6 @@ logs/
 *.wav
 *.mp3
 .pytest_cache/
+
+data/
+*.jsonl

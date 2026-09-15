@@ -1,0 +1,29 @@
+DEPARTMENT: Customer Support / General Queries
+COMPANY: SecureLoan Finance
+
+Working Hours: Monday to Saturday, 9:00 AM – 7:00 PM IST
+Helpline: 1800-123-4567
+Email: support@secureloan.in
+WhatsApp Support: +91-98765-43210
+
+Services:
+- Application status tracking
+- Document pending clarification
+- EMI payment issues
+- Statement & NOC requests
+- Address / mobile number update
+- Complaint registration
+
+How to track application:
+- Use Application ID on website/app
+- Or provide registered mobile number
+
+EMI Payment Options:
+- Auto-debit (NACH)
+- UPI / Net Banking
+- Payment link sent on SMS
+
+Escalation:
+- Level 1: Customer Support
+- Level 2: Branch Manager
+- Level 3: Grievance Officer (grievance@secureloan.in)

@@ -1,0 +1,34 @@
+DEPARTMENT: Personal Loan
+COMPANY: SecureLoan Finance
+
+Products:
+- Instant Personal Loan (up to ₹5 Lakh, 24 hours approval)
+- Salary-based Personal Loan (up to ₹25 Lakh)
+- Debt Consolidation Loan
+
+Interest Rate: 10.5% – 24% p.a. (depending on credit score)
+Tenure: 12 to 60 months
+Processing Fee: 1% – 3% of loan amount
+
+Eligibility:
+- Age 21–60 years
+- Minimum salary ₹25,000 per month
+- Credit score 700+ preferred
+- Salaried or self-employed
+
+Documents Required:
+- Aadhaar + PAN
+- Latest 3 months salary slips
+- Bank statements (6 months)
+- Passport size photo
+
+Process:
+1. Check eligibility (2 minutes)
+2. Submit documents
+3. Approval in 24–48 hours
+4. Amount credited to bank account
+
+Common Questions:
+- Prepayment charges: 2–4% after 12 months
+- Late payment: 2% per month on overdue amount
+- Can I apply online? Yes, fully digital process

@@ -1,25 +1,19 @@
-Company FAQ – Kipps Clone Demo
+SecureLoan Finance – Company Overview
 
-Q: What does your AI Voice Agent do?
-A: It handles inbound and outbound phone calls, qualifies leads, books appointments, answers FAQs, and can transfer to a human when needed.
+SecureLoan Finance is a trusted non-banking financial company (NBFC) offering Personal Loans, Home Loans, Business Loans and Credit Cards across India.
 
-Q: How much does it cost?
-A: Pricing starts at $99 per month for the Starter plan which includes 500 minutes. Conversation cost is typically 5–12 credits per minute depending on the voice and LLM used.
+Head Office: Mumbai
+Working Hours: Monday to Saturday, 9:00 AM – 7:00 PM IST
+Main Helpline: 1800-123-4567
+Website: www.secureloan.in
+Email: support@secureloan.in
 
-Q: Do you support multiple languages?
-A: Yes, we support 50+ languages including Hindi, English, Spanish, Arabic, and major Indian regional languages.
+Departments:
+1. Personal Loan
+2. Home Loan
+3. Business Loan
+4. Credit Card
+5. Customer Support
+6. Collections / Recovery
 
-Q: Can it integrate with my CRM?
-A: Yes. We have native integrations with HubSpot, Zoho, Salesforce, and can connect via webhooks or Zapier to almost any system.
-
-Q: Is there a free trial?
-A: Yes. You can get free credits on signup and test the agent immediately with our "Call Me Now" feature.
-
-Q: What industries do you serve?
-A: EdTech, Healthcare, Hospitality, Real Estate, Financial Services, E-commerce, and more.
-
-Q: How natural does the voice sound?
-A: We use advanced TTS engines like ElevenLabs and Cartesia so the agent sounds human-like with natural pauses and intonation.
-
-Q: Can the agent make outbound calls?
-A: Yes. You can upload a lead list and the agent will automatically dial, qualify, and book meetings.
+For any specific product query, please ask for the relevant department.

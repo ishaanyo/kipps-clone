@@ -1,0 +1,36 @@
+DEPARTMENT: Credit Card
+COMPANY: SecureLoan Finance
+
+Products:
+- SecureLoan Classic Card (entry level)
+- SecureLoan Gold Card
+- SecureLoan Platinum Rewards Card
+- SecureLoan Business Credit Card
+
+Key Benefits:
+- Welcome benefits up to ₹5,000
+- Fuel surcharge waiver
+- Reward points on every spend
+- Airport lounge access (Platinum)
+- EMI conversion facility
+
+Fees:
+- Classic: Joining fee ₹499 (waived on spend)
+- Gold: ₹1,499
+- Platinum: ₹2,999
+- Annual fee same as joining (waivable)
+
+Eligibility:
+- Age 21–60
+- Minimum income ₹25,000 (Classic) to ₹75,000 (Platinum)
+- Credit score 700+
+
+Documents:
+- Aadhaar + PAN
+- Income proof
+- Address proof
+
+Common Questions:
+- How to increase limit? After 6 months of good usage
+- Interest free period: up to 50 days
+- Cash withdrawal interest starts immediately

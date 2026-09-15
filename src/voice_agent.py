@@ -1,6 +1,6 @@
 import os
 import yaml
-from typing import List, Dict
+from typing import List, Dict, Optional
 from loguru import logger
 
 from src.llm.openai_llm import OpenAILLM
@@ -10,6 +10,7 @@ from src.knowledge.knowledge_base import KnowledgeBase
 from src.tools.calendar import book_appointment
 from src.tools.crm import update_crm
 from src.utils.audio import record_audio, play_audio, numpy_to_wav_bytes
+from src.utils.lead_store import LeadStore
 import numpy as np
 
 
@@ -18,11 +19,13 @@ class VoiceAgent:
         self.config = self._load_config(config_path)
         self.messages: List[Dict] = []
         self.kb = KnowledgeBase()
+        self.current_department: Optional[str] = None   # tracks selected department
         self._setup_knowledge()
         self._setup_llm()
         self._setup_stt()
         self._setup_tts()
         self.turn_count = 0
+        self.lead_store = LeadStore()
         logger.info(f"Voice Agent '{self.config['agent']['name']}' ready (AICredits)")
 
     def _load_config(self, path: str) -> dict:
@@ -30,30 +33,37 @@ class VoiceAgent:
             return yaml.safe_load(f)
 
     def _setup_knowledge(self):
+        # Load general sources
         for source in self.config.get("knowledge", {}).get("sources", []):
             if source["type"] == "text":
-                self.kb.add_text(source["content"])
+                self.kb.add_text(source["content"], department="general")
             elif source["type"] == "file":
                 self.kb.add_file(source["path"])
+
+        # Load all department files
+        if self.config.get("knowledge", {}).get("load_departments_folder", True):
+            self.kb.load_departments_folder("knowledge_docs/departments")
+
+        logger.info(f"Departments loaded: {self.kb.list_departments()}")
 
     def _setup_llm(self):
         llm_cfg = self.config["agent"]["llm"]
         self.llm = OpenAILLM(
             model=llm_cfg.get("model", "openai/gpt-4o-mini"),
-            temperature=llm_cfg.get("temperature", 0.6),
-            max_tokens=llm_cfg.get("max_tokens", 300),
+            temperature=llm_cfg.get("temperature", 0.5),
+            max_tokens=llm_cfg.get("max_tokens", 350),
         )
 
         self.llm.register_tool(
             name="book_appointment",
-            description="Book an appointment for the caller.",
+            description="Book a callback, demo or branch visit for the caller.",
             parameters={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Caller's full name"},
                     "phone": {"type": "string", "description": "Caller's phone number"},
                     "datetime_str": {"type": "string", "description": "YYYY-MM-DD HH:MM"},
-                    "purpose": {"type": "string", "description": "Purpose of meeting"},
+                    "purpose": {"type": "string", "description": "Purpose / department"},
                 },
                 "required": ["name", "phone", "datetime_str"],
             },
@@ -81,13 +91,19 @@ class VoiceAgent:
 
         self.llm.register_tool(
             name="transfer_to_human",
-            description="Transfer the call to a human agent.",
+            description="Transfer the call to a human agent or specific department.",
             parameters={
                 "type": "object",
-                "properties": {"reason": {"type": "string"}},
+                "properties": {
+                    "reason": {"type": "string"},
+                    "department": {"type": "string", "description": "Target department if known"},
+                },
                 "required": ["reason"],
             },
-            handler=lambda reason: f"Transferring to human. Reason: {reason}. Please hold.",
+            handler=lambda reason, department=None: (
+                f"Transferring you to {'the ' + department + ' team' if department else 'a human agent'}. "
+                f"Reason: {reason}. Please hold."
+            ),
         )
 
     def _setup_stt(self):
@@ -103,17 +119,37 @@ class VoiceAgent:
         )
         logger.info(f"TTS → AICredits ({tts_cfg.get('voice', 'alloy')})")
 
-    def _build_system_prompt(self) -> str:
+    def _build_system_prompt(self, user_text: str = "") -> str:
         base = self.config["agent"]["system_prompt"]
         persona = self.config["agent"].get("persona", "")
-        knowledge = self.kb.get_context()
+
+        # Detect department from current message if not set
+        detected = self.kb.detect_department(user_text)
+        if detected and not self.current_department:
+            self.current_department = detected
+            logger.info(f"Department set to: {detected}")
+
+        # Also try to detect from conversation history
+        if not self.current_department:
+            for msg in reversed(self.messages[-6:]):
+                if msg.get("role") == "user":
+                    detected = self.kb.detect_department(msg.get("content", ""))
+                    if detected:
+                        self.current_department = detected
+                        break
+
+        # Build RAG context
+        if self.current_department:
+            rag_context = self.kb.search(user_text or "loan", department=self.current_department)
+            dept_name = self.kb.get_department_display_name(self.current_department)
+            dept_info = f"\nCURRENT DEPARTMENT: {dept_name}\n\nRELEVANT KNOWLEDGE:\n{rag_context}"
+        else:
+            dept_info = f"\n{self.kb.get_all_departments_summary()}\n\nNo department selected yet. Ask the caller which department they need."
+
         return f"""{persona}
 
 {base}
-
-=== KNOWLEDGE BASE ===
-{knowledge}
-=== END KNOWLEDGE ===
+{dept_info}
 """
 
     def process_text(self, user_text: str) -> str:
@@ -123,7 +159,13 @@ class VoiceAgent:
         self.messages.append({"role": "user", "content": user_text})
         self.turn_count += 1
 
-        system_prompt = self._build_system_prompt()
+        # Update department if mentioned
+        detected = self.kb.detect_department(user_text)
+        if detected:
+            self.current_department = detected
+            logger.info(f"Department switched to: {detected}")
+
+        system_prompt = self._build_system_prompt(user_text)
         result = self.llm.chat(self.messages, system_prompt=system_prompt)
 
         if result["tool_calls"]:
@@ -150,8 +192,8 @@ class VoiceAgent:
         response_text = result["content"] or "Sorry, I couldn't generate a response."
         self.messages.append({"role": "assistant", "content": response_text})
 
-        if len(self.messages) > 20:
-            self.messages = self.messages[-16:]
+        if len(self.messages) > 22:
+            self.messages = self.messages[-18:]
 
         return response_text
 
@@ -168,10 +210,10 @@ class VoiceAgent:
         wav_bytes = numpy_to_wav_bytes(audio)
         return self.stt.transcribe(wav_bytes)
 
-    def run_conversation_loop(self, max_turns: int = 10):
+    def run_conversation_loop(self, max_turns: int = 15):
         greeting = self.config["conversation"].get(
             "greeting",
-            "Hi! Thanks for calling. This is the AI assistant. How can I help you today?"
+            "Welcome to SecureLoan Finance. Which department can I help you with today?"
         )
         print("\n" + "=" * 60)
         print(f"  {self.config['agent']['name']} is ready (powered by AICredits)")
@@ -191,7 +233,7 @@ class VoiceAgent:
 
             end_phrases = self.config["conversation"].get("end_phrases", [])
             if any(p in user_text.lower() for p in end_phrases):
-                self.speak("Thank you for calling. Have a great day! Goodbye.")
+                self.speak("Thank you for calling SecureLoan Finance. Have a great day! Goodbye.")
                 break
 
             response = self.process_text(user_text)
@@ -204,8 +246,18 @@ class VoiceAgent:
         os.makedirs("logs", exist_ok=True)
         path = f"logs/transcript_{self.turn_count}.txt"
         with open(path, "w") as f:
+            f.write(f"Department: {self.current_department or 'Not selected'}\n\n")
             for m in self.messages:
                 role = m.get("role", "unknown")
                 content = m.get("content", "")
                 f.write(f"{role.upper()}: {content}\n\n")
         logger.info(f"Transcript saved → {path}")
+
+        # Append structured lead data (JSONL) after every conversation
+        try:
+            self.lead_store.save_conversation(
+                messages=self.messages,
+                department=self.current_department,
+            )
+        except Exception as e:
+            logger.error(f"Failed to save lead: {e}")
