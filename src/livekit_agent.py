@@ -36,12 +36,13 @@ STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
 STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
 
-# TTS – prefer Sarvam for natural Indian / Hinglish voice
-# bulbul-v2 speakers: anushka, manisha, vidya, arya, abhilash, karun, hitesh
-# bulbul-v3 speakers: priya, ishita, simran, shubh, aditya, anand, ...
+# TTS – Sarvam model + OpenAI-style voice name
+# AICredits maps OpenAI voices (alloy/nova/shimmer/...) → real Sarvam speakers.
+# Passing native Sarvam names (priya/anushka) currently gets rewritten to the
+# invalid legacy speaker "meera" by the LiveKit↔AICredits path.
 TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v3")
 TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "priya")  # natural female voice
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "nova")  # AICredits maps this to a good Sarvam voice
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -97,18 +98,23 @@ def _make_llm():
 def _make_tts():
     """
     Create TTS via AICredits OpenAI-compatible gateway.
-    Prefers Sarvam (natural Indian voices) with OpenAI TTS as fallback.
+    Prefer Sarvam model for Indian voice quality.
+    Important: use OpenAI-style voice names (nova/alloy/shimmer...).
+    AICredits maps them to real Sarvam speakers. Passing native Sarvam
+    names currently gets rewritten to the invalid speaker "meera".
     """
-    # Known good speakers
-    sarvam_v2_voices = {"anushka", "manisha", "vidya", "arya", "abhilash", "karun", "hitesh"}
-    sarvam_v3_voices = {
-        "shubh", "aditya", "ritu", "priya", "neha", "rahul", "pooja", "rohan",
-        "simran", "kavya", "amit", "dev", "ishita", "shreya", "ratan", "varun",
-        "anand", "tanya", "sunny", "mani", "gokul", "vijay", "shruti", "suhani",
-    }
     openai_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
 
-    voice = (TTS_VOICE or "priya").lower().strip()
+    voice = (TTS_VOICE or "nova").lower().strip()
+    if voice not in openai_voices:
+        # User passed a Sarvam-native name → remap to a safe OpenAI name
+        # so AICredits does the correct speaker mapping.
+        logger.warning(
+            f"Voice '{voice}' looks like a native Sarvam name. "
+            f"Using 'nova' instead so AICredits maps it correctly "
+            f"(native names currently become 'meera' via LiveKit plugin)."
+        )
+        voice = "nova"
 
     candidates = []
     for m in (TTS_MODEL, TTS_FALLBACK, "sarvam/bulbul-v3", "sarvam/bulbul-v2", "tts-1"):
@@ -117,31 +123,15 @@ def _make_tts():
             candidates.append(m)
 
     for model in candidates:
-        is_sarvam = "sarvam" in model.lower() or "bulbul" in model.lower()
-        is_v3 = "v3" in model.lower()
-
-        # Pick a safe voice for this model
-        use_voice = voice
-        if is_sarvam:
-            allowed = sarvam_v3_voices if is_v3 else sarvam_v2_voices
-            if use_voice not in allowed:
-                use_voice = "priya" if is_v3 else "anushka"
-                logger.warning(
-                    f"Voice '{voice}' not valid for {model}. Using '{use_voice}' instead."
-                )
-        else:
-            if use_voice not in openai_voices:
-                use_voice = "alloy"
-
-        kwargs = dict(model=model, voice=use_voice, api_key=AICREDITS_KEY)
+        kwargs = dict(model=model, voice=voice, api_key=AICREDITS_KEY)
         try:
             tts = openai.TTS(**kwargs, base_url=AICREDITS_BASE)
-            logger.info(f"TTS model={model} voice={use_voice} (via AICredits)")
+            logger.info(f"TTS model={model} voice={voice} (via AICredits)")
             return tts
         except TypeError:
             try:
                 tts = openai.TTS(**kwargs)
-                logger.info(f"TTS model={model} voice={use_voice} (no base_url)")
+                logger.info(f"TTS model={model} voice={voice} (no base_url)")
                 return tts
             except Exception as e:
                 logger.warning(f"TTS {model} failed: {e}")
