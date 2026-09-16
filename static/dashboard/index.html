@@ -192,22 +192,22 @@
           <h1>No AI Agents Created Yet!</h1>
           <p>Start building intelligent conversational experiences. Create chatbots, voicebots, and WhatsApp agents.</p>
           <div class="create-grid">
-            <div class="create-card chat" onclick="startCreate('chat')"><div class="icon-wrap">💬</div><h3>Create Chatbot</h3><p>Text agents for websites and support.</p><a href="#">Get Started →</a></div>
-            <div class="create-card voice" onclick="startCreate('voice')"><div class="icon-wrap">🎙️</div><h3>Create Voicebot</h3><p>Voice agents for phone & browser calls.</p><a href="#">Get Started →</a></div>
-            <div class="create-card wa" onclick="startCreate('whatsapp')"><div class="icon-wrap">💚</div><h3>Create WhatsApp Agent</h3><p>WhatsApp messaging automation.</p><a href="#">Get Started →</a></div>
+            <div class="create-card chat" onclick="startCreate('chat', event)"><div class="icon-wrap">💬</div><h3>Create Chatbot</h3><p>Text agents for websites and support.</p><span style="color:inherit;font-weight:600">Get Started →</span></div>
+            <div class="create-card voice" onclick="startCreate('voice', event)"><div class="icon-wrap">🎙️</div><h3>Create Voicebot</h3><p>Voice agents for phone & browser calls.</p><span style="color:inherit;font-weight:600">Get Started →</span></div>
+            <div class="create-card wa" onclick="startCreate('whatsapp', event)"><div class="icon-wrap">💚</div><h3>Create WhatsApp Agent</h3><p>WhatsApp messaging automation.</p><span style="color:inherit;font-weight:600">Get Started →</span></div>
           </div>
           <div class="cta-row">
-            <button class="btn btn-primary" onclick="startCreate('chat')">💬 Create Your First Chatbot</button>
-            <button class="btn btn-outline" onclick="startCreate('voice')">🎙️ Create Your First Voicebot</button>
-            <button class="btn btn-outline green" onclick="startCreate('whatsapp')">💚 Create Your First WhatsApp Agent</button>
+            <button class="btn btn-primary" onclick="startCreate('chat', event)">💬 Create Your First Chatbot</button>
+            <button class="btn btn-outline" onclick="startCreate('voice', event)">🎙️ Create Your First Voicebot</button>
+            <button class="btn btn-outline green" onclick="startCreate('whatsapp', event)">💚 Create Your First WhatsApp Agent</button>
           </div>
         </div>
         <div id="agentsList" class="hidden">
           <div class="page-head">
             <h2>Agents</h2>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" onclick="startCreate('voice')">+ Voicebot</button>
-              <button class="btn btn-primary btn-sm" onclick="startCreate('chat')">+ Agent</button>
+              <button class="btn btn-outline btn-sm" onclick="startCreate('voice', event)">+ Voicebot</button>
+              <button class="btn btn-primary btn-sm" onclick="startCreate('chat', event)">+ Agent</button>
             </div>
           </div>
           <table class="agent-table">
@@ -395,15 +395,19 @@ document.querySelectorAll('.sidebar .nav-item').forEach(btn => {
   });
 });
 
-function startCreate(type) {
-  createType = type;
-  const label = type === 'voice' ? 'Voicebot' : type === 'whatsapp' ? 'WhatsApp Agent' : 'Chatbot';
+
+function startCreate(type, ev) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  createType = type || 'chat';
+  const label = createType === 'voice' ? 'Voicebot' : createType === 'whatsapp' ? 'WhatsApp Agent' : 'Chatbot';
   document.getElementById('tplTitle').textContent = 'Choose ' + label + ' Template';
   document.getElementById('trainTypeLabel').textContent = label;
   selectedTpl = TEMPLATES[0];
   activeCat = 'all';
   document.querySelectorAll('.tpl-cat').forEach(c => c.classList.toggle('active', c.dataset.cat === 'all'));
   renderTemplates();
+  // Keep Agents page visible underneath; open modal on top
+  document.getElementById('trainBackdrop').classList.remove('open');
   document.getElementById('tplBackdrop').classList.add('open');
 }
 function closeTpl() { document.getElementById('tplBackdrop').classList.remove('open'); }
@@ -421,18 +425,33 @@ document.querySelectorAll('.tpl-cat').forEach(c => {
   });
 });
 
+// Do NOT close modal when clicking the dark backdrop (only Cancel / X)
+['tplBackdrop', 'trainBackdrop'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    if (e.target === el) {
+      // ignore backdrop clicks — user must use Cancel
+      e.stopPropagation();
+    }
+  });
+});
+
 function renderTemplates() {
   const q = (document.getElementById('tplSearch').value || '').toLowerCase();
   const list = TEMPLATES.filter(t => (activeCat === 'all' || t.cat === activeCat) && (!q || t.title.toLowerCase().includes(q)));
   document.getElementById('tplMeta').textContent = list.length + ' templates available';
   document.getElementById('tplGrid').innerHTML = list.map(t => `
-    <div class="tpl-card ${selectedTpl.id === t.id ? 'selected' : ''}" onclick="selectTpl('${t.id}')">
+    <div class="tpl-card ${selectedTpl && selectedTpl.id === t.id ? 'selected' : ''}" data-id="${t.id}">
       <div class="preview">📄 ${t.title}</div>
       <h5>${t.title}</h5>
       <div class="tag"><span>${t.desc}</span><span class="radio"></span></div>
     </div>
   `).join('');
-  document.getElementById('tplSelectedName').textContent = selectedTpl.title;
+  document.getElementById('tplGrid').querySelectorAll('.tpl-card').forEach(card => {
+    card.addEventListener('click', () => selectTpl(card.dataset.id));
+  });
+  document.getElementById('tplSelectedName').textContent = (selectedTpl && selectedTpl.title) || 'Blank';
 }
 function selectTpl(id) {
   selectedTpl = TEMPLATES.find(t => t.id === id) || TEMPLATES[0];
@@ -440,6 +459,7 @@ function selectTpl(id) {
 }
 
 function openTraining() {
+  if (!selectedTpl) selectedTpl = TEMPLATES[0];
   closeTpl();
   document.getElementById('fPrompt').value = selectedTpl.prompt;
   document.getElementById('fName').value = selectedTpl.title;
@@ -468,23 +488,41 @@ function previewSend() {
 }
 
 async function load() {
-  const res = await fetch('/api/saas/companies');
-  companies = await res.json();
+  try {
+    const res = await fetch('/api/saas/companies');
+    companies = await res.json();
+  } catch (e) {
+    console.error(e);
+    companies = [];
+  }
   agents = [];
   for (const c of companies) {
-    const ar = await fetch('/api/saas/companies/' + c.id + '/agents');
-    const list = await ar.json();
-    list.forEach(a => agents.push({ ...a, company_name: c.name, company_slug: c.slug }));
+    try {
+      const ar = await fetch('/api/saas/companies/' + c.id + '/agents');
+      const list = await ar.json();
+      list.forEach(a => agents.push({ ...a, company_name: c.name, company_slug: c.slug }));
+    } catch (e) { console.error(e); }
   }
   const sel = document.getElementById('fCompany');
-  sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('') || '<option value="">New company on save</option>';
-  if (companies[0]) document.getElementById('orgName').textContent = companies[0].name;
+  if (sel) {
+    sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('') || '<option value="">New company on save</option>';
+  }
+  if (companies[0]) {
+    const org = document.getElementById('orgName');
+    if (org) org.textContent = companies[0].name;
+  }
 
   const empty = document.getElementById('agentsEmpty');
   const list = document.getElementById('agentsList');
-  if (!agents.length) { empty.classList.remove('hidden'); list.classList.add('hidden'); }
-  else {
-    empty.classList.add('hidden'); list.classList.remove('hidden');
+  // Never close open create modals when refreshing list
+  const tplOpen = document.getElementById('tplBackdrop').classList.contains('open');
+  const trainOpen = document.getElementById('trainBackdrop').classList.contains('open');
+  if (!agents.length) {
+    empty.classList.remove('hidden');
+    list.classList.add('hidden');
+  } else {
+    empty.classList.add('hidden');
+    list.classList.remove('hidden');
     document.getElementById('agentRows').innerHTML = agents.map(a => `
       <tr>
         <td><strong>${a.name}</strong><div style="color:#6b7280;font-size:12px">${a.slug}</div></td>
@@ -495,6 +533,8 @@ async function load() {
         <td><a class="btn btn-outline btn-sm" href="/?company=${a.company_slug}&agent=${a.slug}">Test call</a></td>
       </tr>`).join('');
   }
+  if (tplOpen) document.getElementById('tplBackdrop').classList.add('open');
+  if (trainOpen) document.getElementById('trainBackdrop').classList.add('open');
 }
 
 async function saveAgent() {
@@ -511,7 +551,9 @@ async function saveAgent() {
     companyId = (await cr.json()).id;
   }
   const name = document.getElementById('fName').value || selectedTpl.title;
-  const slug = (document.getElementById('fSlug').value || name).toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  let slug = (document.getElementById('fSlug').value || name).toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  // unique slug if duplicate
+  slug = slug + '-' + Math.random().toString(36).slice(2, 6);
   const body = {
     name, slug,
     description: createType + ' · ' + selectedTpl.title,
@@ -530,7 +572,9 @@ async function saveAgent() {
   });
   if (!res.ok) { alert(await res.text()); return; }
   closeTrain();
+  closeTpl();
   await load();
+  alert('Agent created: ' + name);
 }
 
 renderTemplates();
