@@ -167,12 +167,27 @@
     }
 
     async function endCall() {
-      if (room) {
-        await room.disconnect();
-        room = null;
+      try {
+        if (room) {
+          // Stop local mic tracks
+          room.localParticipant.trackPublications.forEach((pub) => {
+            if (pub.track) {
+              pub.track.stop();
+            }
+          });
+          await room.disconnect();
+          room = null;
+        }
+        // Remove any attached remote audio elements
+        document.querySelectorAll('audio').forEach((el) => {
+          el.srcObject = null;
+          el.remove();
+        });
+      } catch (e) {
+        log('End error: ' + e.message);
       }
-      setLive(false, 'Call ended');
-      log('You left the call.');
+      setLive(false, 'Call ended — session closed');
+      log('Call ended. Agent session should close & lead saved.');
     }
   </script>
 </body>

@@ -1,9 +1,6 @@
 """
-LiveKit voice agent worker — continuous call via WebRTC.
-STT/LLM/TTS via AICredits. Saves leads on hangup.
-
-Run:
-    python -m src.livekit_agent dev
+LiveKit voice agent — AICredits STT/LLM/TTS.
+Hinglish-friendly models (Sarvam when available).
 """
 from __future__ import annotations
 
@@ -24,61 +21,69 @@ from loguru import logger
 try:
     from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
     from livekit.plugins import openai, silero
-except ImportError as e:
-    print('Install: pip install "livekit-agents[openai,silero]" livekit-api livekit httpx')
-    raise SystemExit(1) from e
+except ImportError:
+    print('Install: pip install "livekit-agents[openai,silero]" livekit-api livekit')
+    raise SystemExit(1)
 
 from src.utils.lead_store import LeadStore
 
 AICREDITS_BASE = (os.getenv("AICREDITS_BASE_URL") or "https://api.aicredits.in/v1").rstrip("/")
 AICREDITS_KEY = os.getenv("AICREDITS_API_KEY") or os.getenv("OPENAI_API_KEY")
 
+# Multilingual / India-friendly defaults (override in .env)
+# STT: Sarvam Saarika is strong for Indian languages; Whisper as fallback
+STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
+STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
+LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
+TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v2")
+TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "alloy")  # used for OpenAI TTS fallback
+
 INSTRUCTIONS = """
-You are SecureLoan Finance's live phone AI agent in India.
+You are SecureLoan Finance's live phone AI agent for India.
 
-LANGUAGE (critical):
-- Detect the caller's language from what they say.
-- Reply in the SAME language / mix they use.
-- If they use Hindi or Hinglish, answer in natural Hinglish (spoken, not formal written Hindi).
-- If pure English, use simple clear English.
-- Examples of Hinglish style: "Bilkul, main help karta hoon.", "Aapko home loan chahiye kya?", "Achha, kitna loan chahiye roughly?"
+LANGUAGE (must follow):
+- Always reply in the same language mix the caller is using RIGHT NOW.
+- Hindi only → pure simple Hindi (spoken style).
+- Hinglish → natural Hinglish (e.g. "Bilkul sir, home loan ke liye kitna amount chahiye?").
+- English only → simple clear English.
+- Never force English if the user spoke Hindi/Hinglish.
+- Keep answers short for speech (1-3 sentences). No markdown or symbols.
 
-BEHAVIOR:
-- Short spoken replies (1-3 sentences). No markdown, bullets, or symbols.
-- Departments: Personal Loan, Home Loan, Business Loan, Gold Loan, Credit Card, Customer Support, Collections.
-- If department unclear, ask once which department.
-- Qualify: amount, city, income/employment when relevant. Offer callback with name + phone.
-- Never invent interest rates. If unsure, say you'll arrange a human callback.
-- Always answer the user's last message — never stay silent after they speak.
+PRODUCT:
+Departments: Personal Loan, Home Loan, Business Loan, Gold Loan, Credit Card, Customer Support, Collections.
+Ask department if unclear. Qualify amount, city, income when relevant. Offer callback with name + phone.
+Never invent rates. Always respond to the last user message.
 """
 
 
 def _make_stt():
-    """Prefer custom HTTP STT; fall back to openai plugin."""
+    from src.aicredits_stt import AICreditsSTT
+
+    # language=None → auto-detect (better for Hindi/English mix)
     try:
-        from src.aicredits_stt import AICreditsSTT
         stt = AICreditsSTT(
-            model=os.getenv("LIVEKIT_STT_MODEL", "whisper-1"),
+            model=STT_MODEL,
+            language=None,
+            base_url=AICREDITS_BASE,
+            api_key=AICREDITS_KEY,
+            fallback_model=STT_FALLBACK,
+        )
+        logger.info(f"STT primary={STT_MODEL} fallback={STT_FALLBACK}")
+        return stt
+    except TypeError:
+        stt = AICreditsSTT(
+            model=STT_FALLBACK,
+            language=None,
             base_url=AICREDITS_BASE,
             api_key=AICREDITS_KEY,
         )
-        logger.info("Using AICredits HTTP STT")
+        logger.info(f"STT={STT_FALLBACK}")
         return stt
-    except Exception as e:
-        logger.warning(f"Custom STT unavailable ({e}), using openai.STT plugin")
-        kwargs = dict(model=os.getenv("LIVEKIT_STT_MODEL", "whisper-1"), api_key=AICREDITS_KEY)
-        try:
-            return openai.STT(**kwargs, base_url=AICREDITS_BASE)
-        except TypeError:
-            return openai.STT(**kwargs)
 
 
 def _make_llm():
-    kwargs = dict(
-        model=os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini"),
-        api_key=AICREDITS_KEY,
-        temperature=0.6,
-    )
+    kwargs = dict(model=LLM_MODEL, api_key=AICREDITS_KEY, temperature=0.55)
     try:
         return openai.LLM(**kwargs, base_url=AICREDITS_BASE)
     except TypeError:
@@ -86,31 +91,36 @@ def _make_llm():
 
 
 def _make_tts():
-    kwargs = dict(
-        model=os.getenv("LIVEKIT_TTS_MODEL", "tts-1"),
-        voice=os.getenv("LIVEKIT_TTS_VOICE", "alloy"),
-        api_key=AICREDITS_KEY,
-    )
-    try:
-        return openai.TTS(**kwargs, base_url=AICREDITS_BASE)
-    except TypeError:
-        return openai.TTS(**kwargs)
+    """Prefer Sarvam for Indian languages; fall back to OpenAI TTS."""
+    for model in (TTS_MODEL, TTS_FALLBACK):
+        kwargs = dict(model=model, api_key=AICREDITS_KEY)
+        if "tts-1" in model or model.startswith("openai"):
+            kwargs["voice"] = TTS_VOICE
+        try:
+            tts = openai.TTS(**kwargs, base_url=AICREDITS_BASE)
+            logger.info(f"TTS model={model}")
+            return tts
+        except TypeError:
+            try:
+                tts = openai.TTS(**kwargs)
+                logger.info(f"TTS model={model} (no base_url kw)")
+                return tts
+            except Exception as e:
+                logger.warning(f"TTS {model} failed: {e}")
+        except Exception as e:
+            logger.warning(f"TTS {model} failed: {e}")
+    raise RuntimeError("No TTS model available")
 
 
 def _build_session() -> AgentSession:
     if not AICREDITS_KEY:
         raise RuntimeError("AICREDITS_API_KEY required")
     vad = silero.VAD.load()
-    session_kwargs = dict(
-        stt=_make_stt(),
-        llm=_make_llm(),
-        tts=_make_tts(),
-        vad=vad,
-    )
+    kwargs = dict(stt=_make_stt(), llm=_make_llm(), tts=_make_tts(), vad=vad)
     try:
-        return AgentSession(**session_kwargs, allow_interruptions=True, min_endpointing_delay=0.7)
+        return AgentSession(**kwargs, allow_interruptions=True, min_endpointing_delay=0.8)
     except TypeError:
-        return AgentSession(**session_kwargs)
+        return AgentSession(**kwargs)
 
 
 async def entrypoint(ctx: JobContext):
@@ -121,16 +131,18 @@ async def entrypoint(ctx: JobContext):
     agent = Agent(instructions=INSTRUCTIONS)
     lead_store = LeadStore()
     transcript_parts: list[dict] = []
+    saved = {"done": False}
 
     def save_lead(reason: str = ""):
+        if saved["done"]:
+            return
+        saved["done"] = True
         try:
-            if not transcript_parts:
-                transcript_parts.append({
-                    "role": "system",
-                    "content": f"Call ended ({reason}) with no captured user text",
-                })
+            msgs = list(transcript_parts) or [
+                {"role": "system", "content": f"Call ended ({reason})"}
+            ]
             path = lead_store.save_conversation(
-                messages=list(transcript_parts),
+                messages=msgs,
                 department="livekit_call",
                 extra={"room": ctx.room.name, "reason": reason},
             )
@@ -156,7 +168,7 @@ async def entrypoint(ctx: JobContext):
                 content = " ".join(str(c) for c in content)
             content = str(content or "").strip()
             if role and content:
-                logger.info(f"ITEM {role}: {content[:100]!r}")
+                logger.info(f"ITEM {role}: {content[:120]!r}")
                 transcript_parts.append({"role": str(role), "content": content})
         except Exception as e:
             logger.warning(f"item: {e}")
@@ -169,9 +181,9 @@ async def entrypoint(ctx: JobContext):
 
     await session.generate_reply(
         instructions=(
-            "Greet briefly in friendly Hinglish-English mix, like a real Indian call center agent. "
-            "Welcome to SecureLoan Finance and ask which department they need. "
-            "Keep it to two short spoken sentences."
+            "Caller se short friendly greeting Hinglish mein do — "
+            "jaise real call center. SecureLoan Finance welcome, "
+            "poocho kaunsa department chahiye. Sirf 2 short sentences."
         )
     )
 
@@ -179,6 +191,16 @@ async def entrypoint(ctx: JobContext):
     def on_disconnect(participant):
         logger.info(f"Participant left: {participant.identity}")
         save_lead("participant_disconnected")
+        # Shut down agent session so worker releases the job
+        try:
+            import asyncio
+            asyncio.create_task(session.aclose())
+        except Exception as e:
+            logger.warning(f"session.aclose: {e}")
+            try:
+                asyncio.create_task(ctx.room.disconnect())
+            except Exception:
+                pass
 
     @ctx.room.on("disconnected")
     def on_room_disconnected():

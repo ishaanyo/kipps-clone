@@ -65,11 +65,13 @@ class AICreditsSTT(stt.STT):
         language: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
+        fallback_model: str | None = "whisper-1",
     ):
         super().__init__(
             capabilities=stt.STTCapabilities(streaming=False, interim_results=False)
         )
         self._model = model
+        self._fallback_model = fallback_model
         self._language = language
         self._base_url = (
             base_url or os.getenv("AICREDITS_BASE_URL") or "https://api.aicredits.in/v1"
@@ -112,23 +114,29 @@ class AICreditsSTT(stt.STT):
         kwargs = {"model": self._model, "file": f, "response_format": "text"}
         if lang:
             kwargs["language"] = lang
-        try:
-            out = client.audio.transcriptions.create(**kwargs)
-            if isinstance(out, str):
-                return out.strip()
-            return (getattr(out, "text", None) or str(out)).strip()
-        except Exception as e:
-            # try alternate model id
-            logger.error(f"STT error with {self._model}: {e}")
+        models_to_try = [self._model]
+        if self._fallback_model and self._fallback_model not in models_to_try:
+            models_to_try.append(self._fallback_model)
+        for mid in ("openai/whisper-1", "whisper-1"):
+            if mid not in models_to_try:
+                models_to_try.append(mid)
+
+        last_err = None
+        for mid in models_to_try:
             try:
-                f2 = BytesIO(wav)
-                f2.name = "audio.wav"
-                out = client.audio.transcriptions.create(
-                    model="openai/whisper-1", file=f2, response_format="text"
-                )
-                if isinstance(out, str):
-                    return out.strip()
-                return (getattr(out, "text", None) or str(out)).strip()
-            except Exception as e2:
-                logger.error(f"STT fallback failed: {e2}")
-                return ""
+                f = BytesIO(wav)
+                f.name = "audio.wav"
+                kw = {"model": mid, "file": f, "response_format": "text"}
+                if lang:
+                    kw["language"] = lang
+                out = client.audio.transcriptions.create(**kw)
+                text_out = out if isinstance(out, str) else (getattr(out, "text", None) or str(out))
+                text_out = (text_out or "").strip()
+                if text_out:
+                    logger.info(f"STT ok model={mid}")
+                    return text_out
+            except Exception as e:
+                last_err = e
+                logger.warning(f"STT model={mid} failed: {e}")
+        logger.error(f"All STT models failed: {last_err}")
+        return ""
