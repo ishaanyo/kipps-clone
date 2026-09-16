@@ -36,13 +36,11 @@ STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
 STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
 
-# TTS – OpenAI path only (reliable through AICredits).
-# Sarvam bulbul via LiveKit OpenAI plugin is currently broken on AICredits:
-# native names → "meera", OpenAI names → "diya" (both invalid).
-# STT still uses Sarvam. LLM still generates Hinglish. Only the voice is OpenAI.
-TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "tts-1")
-TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1-hd")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "nova")  # alloy | echo | fable | onyx | nova | shimmer
+# TTS – use custom AICredits TTS (bypasses broken LiveKit OpenAI plugin mapping)
+# Real Sarvam models + native speaker names work here.
+TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v3")
+TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "priya")  # Sarvam: priya, ishita, anushka, shubh...
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -97,47 +95,23 @@ def _make_llm():
 
 def _make_tts():
     """
-    Create TTS via AICredits OpenAI-compatible gateway.
-    Only uses openai/tts-1 / tts-1-hd — Sarvam bulbul is currently broken
-    when called through the LiveKit OpenAI plugin (invalid speaker mapping).
+    Custom AICredits TTS that calls /v1/audio/speech directly.
+    This bypasses the LiveKit OpenAI plugin voice-mapping bug
+    (meera / diya) so real Sarvam speakers work.
     """
-    openai_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
-    voice = (TTS_VOICE or "nova").lower().strip()
-    if voice not in openai_voices:
-        logger.warning(f"Invalid TTS voice '{voice}', forcing 'nova'")
-        voice = "nova"
+    from src.aicredits_tts import AICreditsTTS
 
-    candidates = []
-    for m in (TTS_MODEL, TTS_FALLBACK, "tts-1", "tts-1-hd"):
-        m = (m or "").strip()
-        # Skip any Sarvam / bulbul model — broken mapping on AICredits right now
-        if not m or "sarvam" in m.lower() or "bulbul" in m.lower():
-            if m:
-                logger.warning(f"Skipping broken Sarvam TTS model: {m}")
-            continue
-        if m not in candidates:
-            candidates.append(m)
+    model = (TTS_MODEL or "sarvam/bulbul-v3").strip()
+    voice = (TTS_VOICE or "priya").strip().lower()
 
-    if not candidates:
-        candidates = ["tts-1"]
-
-    for model in candidates:
-        kwargs = dict(model=model, voice=voice, api_key=AICREDITS_KEY)
-        try:
-            tts = openai.TTS(**kwargs, base_url=AICREDITS_BASE)
-            logger.info(f"TTS model={model} voice={voice} (via AICredits)")
-            return tts
-        except TypeError:
-            try:
-                tts = openai.TTS(**kwargs)
-                logger.info(f"TTS model={model} voice={voice} (no base_url)")
-                return tts
-            except Exception as e:
-                logger.warning(f"TTS {model} failed: {e}")
-        except Exception as e:
-            logger.warning(f"TTS {model} failed: {e}")
-
-    raise RuntimeError("No working TTS model available via AICredits")
+    tts = AICreditsTTS(
+        model=model,
+        voice=voice,
+        base_url=AICREDITS_BASE,
+        api_key=AICREDITS_KEY,
+    )
+    logger.info(f"TTS model={model} voice={voice} (direct AICredits)")
+    return tts
 
 
 def _build_session() -> AgentSession:
