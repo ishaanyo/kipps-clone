@@ -36,13 +36,13 @@ STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
 STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
 
-# TTS – Sarvam model + OpenAI-style voice name
-# AICredits maps OpenAI voices (alloy/nova/shimmer/...) → real Sarvam speakers.
-# Passing native Sarvam names (priya/anushka) currently gets rewritten to the
-# invalid legacy speaker "meera" by the LiveKit↔AICredits path.
-TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v3")
-TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "nova")  # AICredits maps this to a good Sarvam voice
+# TTS – OpenAI path only (reliable through AICredits).
+# Sarvam bulbul via LiveKit OpenAI plugin is currently broken on AICredits:
+# native names → "meera", OpenAI names → "diya" (both invalid).
+# STT still uses Sarvam. LLM still generates Hinglish. Only the voice is OpenAI.
+TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "tts-1")
+TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1-hd")
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "nova")  # alloy | echo | fable | onyx | nova | shimmer
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -98,29 +98,28 @@ def _make_llm():
 def _make_tts():
     """
     Create TTS via AICredits OpenAI-compatible gateway.
-    Prefer Sarvam model for Indian voice quality.
-    Important: use OpenAI-style voice names (nova/alloy/shimmer...).
-    AICredits maps them to real Sarvam speakers. Passing native Sarvam
-    names currently gets rewritten to the invalid speaker "meera".
+    Only uses openai/tts-1 / tts-1-hd — Sarvam bulbul is currently broken
+    when called through the LiveKit OpenAI plugin (invalid speaker mapping).
     """
     openai_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
-
     voice = (TTS_VOICE or "nova").lower().strip()
     if voice not in openai_voices:
-        # User passed a Sarvam-native name → remap to a safe OpenAI name
-        # so AICredits does the correct speaker mapping.
-        logger.warning(
-            f"Voice '{voice}' looks like a native Sarvam name. "
-            f"Using 'nova' instead so AICredits maps it correctly "
-            f"(native names currently become 'meera' via LiveKit plugin)."
-        )
+        logger.warning(f"Invalid TTS voice '{voice}', forcing 'nova'")
         voice = "nova"
 
     candidates = []
-    for m in (TTS_MODEL, TTS_FALLBACK, "sarvam/bulbul-v3", "sarvam/bulbul-v2", "tts-1"):
+    for m in (TTS_MODEL, TTS_FALLBACK, "tts-1", "tts-1-hd"):
         m = (m or "").strip()
-        if m and m not in candidates:
+        # Skip any Sarvam / bulbul model — broken mapping on AICredits right now
+        if not m or "sarvam" in m.lower() or "bulbul" in m.lower():
+            if m:
+                logger.warning(f"Skipping broken Sarvam TTS model: {m}")
+            continue
+        if m not in candidates:
             candidates.append(m)
+
+    if not candidates:
+        candidates = ["tts-1"]
 
     for model in candidates:
         kwargs = dict(model=model, voice=voice, api_key=AICREDITS_KEY)
