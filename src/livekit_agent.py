@@ -61,35 +61,57 @@ Never invent rates. Always respond to the last user message.
 
 
 def _make_stt():
-    """Prefer official Sarvam plugin (multi-turn stable); else AICredits STT."""
-    sarvam_key = os.getenv("SARVAM_API_KEY")
-    if sarvam_key:
+    """
+    Multi-turn reliable STT:
+    1) LiveKit OpenAI Whisper via AICredits (best continuous turn-taking)
+    2) Official Sarvam plugin if available
+    3) Custom AICreditsSTT last
+    """
+    # 1) Whisper through LiveKit openai plugin (stable multi-turn)
+    try:
+        stt = openai.STT(
+            model="whisper-1",
+            language="hi",
+            base_url=AICREDITS_BASE,
+            api_key=AICREDITS_KEY,
+        )
+        logger.info("STT = LiveKit openai.STT whisper-1 via AICredits (multi-turn)")
+        return stt
+    except TypeError:
         try:
-            from livekit.plugins import sarvam
-            # Non-realtime STT is widely available; good for multi-turn
-            try:
-                stt = sarvam.STT(
-                    language="hi-IN",
-                    model="saaras:v4",
-                    mode="codemix",
-                    high_vad_sensitivity=True,
-                )
-            except TypeError:
-                stt = sarvam.STT(language="hi-IN")
-            logger.info("STT = official Sarvam plugin (saaras)")
+            stt = openai.STT(model="whisper-1", language="hi", api_key=AICREDITS_KEY)
+            # point OpenAI client at AICredits via env
+            os.environ.setdefault("OPENAI_BASE_URL", AICREDITS_BASE)
+            logger.info("STT = LiveKit openai.STT whisper-1 (env base)")
             return stt
         except Exception as e:
-            logger.error(f"Official Sarvam STT unavailable — run: pip install livekit-plugins-sarvam | {e}")
+            logger.warning(f"openai.STT failed: {e}")
+    except Exception as e:
+        logger.warning(f"openai.STT failed: {e}")
 
+    # 2) Official Sarvam
+    if os.getenv("SARVAM_API_KEY"):
+        try:
+            from livekit.plugins import sarvam
+            try:
+                stt = sarvam.STT(language="hi-IN", model="saaras:v4", mode="codemix")
+            except TypeError:
+                stt = sarvam.STT(language="hi-IN")
+            logger.info("STT = official Sarvam plugin")
+            return stt
+        except Exception as e:
+            logger.error(f"Sarvam STT unavailable: {e}")
+
+    # 3) Custom
     from src.aicredits_stt import AICreditsSTT
     stt = AICreditsSTT(
-        model=STT_MODEL,
-        language=None,
+        model="whisper-1",
+        language="hi",
         base_url=AICREDITS_BASE,
         api_key=AICREDITS_KEY,
-        fallback_model=STT_FALLBACK,
+        fallback_model="whisper-1",
     )
-    logger.info(f"STT primary={STT_MODEL} fallback={STT_FALLBACK} (AICredits)")
+    logger.info("STT = custom AICreditsSTT whisper-1")
     return stt
 
 
@@ -128,7 +150,9 @@ def _make_tts():
             logger.info(f"TTS = official Sarvam plugin model={model} speaker={voice} lang={lang}")
             return tts
         except Exception as e:
-            logger.error(f"Official Sarvam TTS unavailable — run: pip install livekit-plugins-sarvam | {e}")
+            import traceback
+            logger.error(f"Official Sarvam TTS unavailable — pip install livekit-plugins-sarvam | {e}")
+            logger.error(traceback.format_exc())
 
     from src.aicredits_tts import AICreditsTTS
     tts = AICreditsTTS(
