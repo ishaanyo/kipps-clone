@@ -36,11 +36,11 @@ STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
 STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
 
-# TTS – use custom AICredits TTS (bypasses broken LiveKit OpenAI plugin mapping)
-# Real Sarvam models + native speaker names work here.
+# TTS – native Sarvam when SARVAM_API_KEY is set (correct speakers)
 TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v3")
 TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "priya")  # Sarvam: priya, ishita, anushka, shubh...
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "priya")  # priya, ishita, anushka, shubh, aditya...
+TTS_LANG = os.getenv("LIVEKIT_TTS_LANGUAGE", "hi-IN")
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -95,28 +95,32 @@ def _make_llm():
 
 def _make_tts():
     """
-    Custom AICredits TTS that calls /v1/audio/speech directly.
-    This bypasses the LiveKit OpenAI plugin voice-mapping bug
-    (meera / diya) so real Sarvam speakers work.
+    Prefer native Sarvam API when SARVAM_API_KEY is set (correct speakers).
+    Falls back to AICredits OpenAI-compatible endpoint.
     """
     from src.aicredits_tts import AICreditsTTS
 
     model = (TTS_MODEL or "sarvam/bulbul-v3").strip()
     voice = (TTS_VOICE or "priya").strip().lower()
+    lang = (TTS_LANG or "hi-IN").strip()
+    sarvam_key = os.getenv("SARVAM_API_KEY")
 
     tts = AICreditsTTS(
         model=model,
         voice=voice,
         base_url=AICREDITS_BASE,
         api_key=AICREDITS_KEY,
+        sarvam_api_key=sarvam_key,
+        language_code=lang,
     )
-    logger.info(f"TTS model={model} voice={voice} (direct AICredits)")
+    via = "native Sarvam" if sarvam_key else "AICredits"
+    logger.info(f"TTS model={model} voice={voice} lang={lang} ({via})")
     return tts
 
 
 def _build_session() -> AgentSession:
-    if not AICREDITS_KEY:
-        raise RuntimeError("AICREDITS_API_KEY required")
+    if not AICREDITS_KEY and not os.getenv("SARVAM_API_KEY"):
+        raise RuntimeError("AICREDITS_API_KEY or SARVAM_API_KEY required")
     vad = silero.VAD.load()
     kwargs = dict(stt=_make_stt(), llm=_make_llm(), tts=_make_tts(), vad=vad)
     try:
