@@ -160,9 +160,18 @@ async def entrypoint(ctx: JobContext):
     def on_user(ev):
         text = getattr(ev, "transcript", None) or ""
         is_final = getattr(ev, "is_final", True)
+        text = str(text).strip()
+        # Ignore empty / JSON noise from STT
+        if text.startswith("{") and "transcript" in text:
+            try:
+                import json
+                obj = json.loads(text)
+                text = (obj.get("transcript") or obj.get("text") or "").strip()
+            except Exception:
+                text = ""
         logger.info(f"USER STT final={is_final}: {text!r}")
-        if is_final and str(text).strip():
-            transcript_parts.append({"role": "user", "content": str(text).strip()})
+        if is_final and text:
+            transcript_parts.append({"role": "user", "content": text})
 
     @session.on("conversation_item_added")
     def on_item(ev):

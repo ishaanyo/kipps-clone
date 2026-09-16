@@ -133,16 +133,22 @@ class AICreditsSTT(stt.STT):
                 text_out = out if isinstance(out, str) else (getattr(out, "text", None) or str(out))
                 text_out = (text_out or "").strip()
                 # Sarvam often returns JSON: {"transcript":"...", "language_code":"hi-IN"}
-                if text_out.startswith("{") and "transcript" in text_out:
+                if text_out.startswith("{") and ("transcript" in text_out or "text" in text_out):
                     try:
                         import json
                         obj = json.loads(text_out)
-                        text_out = (obj.get("transcript") or obj.get("text") or text_out).strip()
+                        # IMPORTANT: empty transcript must become "" (not fall back to raw JSON)
+                        parsed = obj.get("transcript")
+                        if parsed is None:
+                            parsed = obj.get("text")
+                        text_out = (parsed if parsed is not None else "").strip()
                     except Exception:
-                        pass
+                        text_out = ""
                 if text_out:
                     logger.info(f"STT ok model={mid} → {text_out!r}")
                     return text_out
+                else:
+                    logger.info(f"STT empty transcript model={mid}")
             except Exception as e:
                 last_err = e
                 logger.warning(f"STT model={mid} failed: {e}")
