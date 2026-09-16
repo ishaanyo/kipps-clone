@@ -114,11 +114,9 @@ class AICreditsSTT(stt.STT):
         kwargs = {"model": self._model, "file": f, "response_format": "text"}
         if lang:
             kwargs["language"] = lang
-        models_to_try = [self._model]
-        if self._fallback_model and self._fallback_model not in models_to_try:
-            models_to_try.append(self._fallback_model)
-        for mid in ("openai/whisper-1", "whisper-1"):
-            if mid not in models_to_try:
+        models_to_try = []
+        for mid in (self._model, self._fallback_model, "whisper-1", "openai/whisper-1"):
+            if mid and mid not in models_to_try:
                 models_to_try.append(mid)
 
         last_err = None
@@ -127,8 +125,11 @@ class AICreditsSTT(stt.STT):
                 f = BytesIO(wav)
                 f.name = "audio.wav"
                 kw = {"model": mid, "file": f, "response_format": "text"}
+                # Prefer Hindi/English mix for India calls
                 if lang:
                     kw["language"] = lang
+                elif "sarvam" not in (mid or "").lower():
+                    kw["language"] = "hi"  # help Whisper on Hinglish
                 out = client.audio.transcriptions.create(**kw)
                 text_out = out if isinstance(out, str) else (getattr(out, "text", None) or str(out))
                 text_out = (text_out or "").strip()
@@ -137,7 +138,6 @@ class AICreditsSTT(stt.STT):
                     try:
                         import json
                         obj = json.loads(text_out)
-                        # IMPORTANT: empty transcript must become "" (not fall back to raw JSON)
                         parsed = obj.get("transcript")
                         if parsed is None:
                             parsed = obj.get("text")
@@ -147,10 +147,9 @@ class AICreditsSTT(stt.STT):
                 if text_out:
                     logger.info(f"STT ok model={mid} → {text_out!r}")
                     return text_out
-                else:
-                    logger.info(f"STT empty transcript model={mid}")
+                logger.info(f"STT empty transcript model={mid} — trying next")
             except Exception as e:
                 last_err = e
                 logger.warning(f"STT model={mid} failed: {e}")
-        logger.error(f"All STT models failed: {last_err}")
+        logger.error(f"All STT models failed or empty: {last_err}")
         return ""
