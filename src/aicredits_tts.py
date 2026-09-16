@@ -107,27 +107,52 @@ class _ChunkedStream(tts.ChunkedStream):
             logger.error(f"TTS audio decode failed: {e}")
             return
 
-        output_emitter.initialize(
-            request_id="sarvam-tts",
-            sample_rate=self._tts.sample_rate,
-            num_channels=NUM_CHANNELS,
-            mime_type="audio/pcm",
-        )
-
-        samples_per_frame = self._tts.sample_rate // 50
-        for i in range(0, len(pcm), samples_per_frame):
-            chunk = pcm[i : i + samples_per_frame]
-            if len(chunk) == 0:
-                continue
-            frame = rtc.AudioFrame(
-                data=chunk.tobytes(),
+        # LiveKit AudioEmitter expects PCM bytes (int16 little-endian)
+        try:
+            output_emitter.initialize(
+                request_id="sarvam-tts",
                 sample_rate=self._tts.sample_rate,
                 num_channels=NUM_CHANNELS,
-                samples_per_channel=len(chunk),
+                mime_type="audio/pcm",
+                stream=False,
             )
-            output_emitter.push(frame)
+        except TypeError:
+            # older SDK without stream kw
+            output_emitter.initialize(
+                request_id="sarvam-tts",
+                sample_rate=self._tts.sample_rate,
+                num_channels=NUM_CHANNELS,
+                mime_type="audio/pcm",
+            )
 
-        output_emitter.flush()
+        samples_per_frame = max(1, self._tts.sample_rate // 50)  # ~20ms
+        pushed = 0
+        pcm_bytes = np.ascontiguousarray(pcm, dtype=np.int16).tobytes()
+        # Push whole buffer in small frames
+        bytes_per_frame = samples_per_frame * NUM_CHANNELS * 2  # int16
+        for i in range(0, len(pcm_bytes), bytes_per_frame):
+            chunk = pcm_bytes[i : i + bytes_per_frame]
+            if not chunk:
+                continue
+            # Prefer bytes push; fall back to AudioFrame
+            try:
+                output_emitter.push(chunk)
+            except TypeError:
+                n_samples = len(chunk) // (NUM_CHANNELS * 2)
+                frame = rtc.AudioFrame(
+                    data=chunk,
+                    sample_rate=self._tts.sample_rate,
+                    num_channels=NUM_CHANNELS,
+                    samples_per_channel=n_samples,
+                )
+                output_emitter.push(frame)
+            pushed += 1
+
+        try:
+            output_emitter.flush()
+        except Exception:
+            pass
+        logger.info(f"TTS pushed {pushed} frames ({len(pcm)} samples)")
 
 
     def _decode_to_pcm(self, audio_bytes: bytes, target_rate: int):
