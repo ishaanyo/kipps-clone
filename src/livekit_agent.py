@@ -79,7 +79,7 @@ def _make_stt():
             logger.info("STT = official Sarvam plugin (saaras)")
             return stt
         except Exception as e:
-            logger.warning(f"Official Sarvam STT unavailable: {e}")
+            logger.error(f"Official Sarvam STT unavailable — run: pip install livekit-plugins-sarvam | {e}")
 
     from src.aicredits_stt import AICreditsSTT
     stt = AICreditsSTT(
@@ -128,7 +128,7 @@ def _make_tts():
             logger.info(f"TTS = official Sarvam plugin model={model} speaker={voice} lang={lang}")
             return tts
         except Exception as e:
-            logger.warning(f"Official Sarvam TTS unavailable: {e}")
+            logger.error(f"Official Sarvam TTS unavailable — run: pip install livekit-plugins-sarvam | {e}")
 
     from src.aicredits_tts import AICreditsTTS
     tts = AICreditsTTS(
@@ -155,6 +155,17 @@ def _build_session() -> AgentSession:
 
 
 async def entrypoint(ctx: JobContext):
+    # PLUGIN CHECK
+    if os.getenv("SARVAM_API_KEY"):
+        try:
+            from livekit.plugins import sarvam  # noqa: F401
+            logger.info("livekit.plugins.sarvam is installed")
+        except Exception as e:
+            logger.error(
+                "SARVAM_API_KEY set but livekit-plugins-sarvam NOT installed. "
+                "Run: pip install livekit-plugins-sarvam  | %s", e
+            )
+
     logger.info(f"Agent joining room: {ctx.room.name}")
     await ctx.connect()
 
@@ -194,6 +205,16 @@ async def entrypoint(ctx: JobContext):
                 text = (obj.get("transcript") or obj.get("text") or "").strip()
             except Exception:
                 text = ""
+        # Ignore filler / echo (agent hearing itself)
+        low = text.lower().strip(" .,!?;:")
+        fillers = {
+            "hmm", "hm", "hmmm", "hmm hmm", "hmm hmm hmm",
+            "uh", "um", "ah", "aa", "haan", "ha", "ok", "okay",
+            "mm", "mmm", "hmm hmm hmm hmm",
+        }
+        if low in fillers or set(low.replace(" ", "")) <= set("hm"):
+            logger.info(f"USER STT ignored filler: {text!r}")
+            return
         logger.info(f"USER STT final={is_final}: {text!r}")
         if is_final and text:
             transcript_parts.append({"role": "user", "content": text})

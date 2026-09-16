@@ -145,6 +145,10 @@ class AICreditsSTT(stt.STT):
                     except Exception:
                         text_out = ""
                 if text_out:
+                    low = text_out.lower().strip(" .,!?;:")
+                    if low in {"hmm","hm","hmmm","hmm hmm","hmm hmm hmm","uh","um","mm","mmm"} or set(low.replace(" ","")) <= set("hm"):
+                        logger.info(f"STT filler ignored model={mid} → {text_out!r}")
+                        return ""
                     logger.info(f"STT ok model={mid} → {text_out!r}")
                     return text_out
                 logger.info(f"STT empty transcript model={mid} — trying next")

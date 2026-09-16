@@ -1,0 +1,39 @@
+CALL FLOW DIAGNOSIS (2026-09-16)
+================================
+
+WHAT WORKS
+- TTS (custom Sarvam API) synthesizes and pushes frames
+- LLM generates Hindi replies
+- Session stays connected for multiple turns
+
+WHAT IS BROKEN
+1) Official livekit-plugins-sarvam DID NOT LOAD
+   Logs still show: src.aicredits_tts / src.aicredits_stt
+   That means: pip install livekit-plugins-sarvam was not done,
+   OR import failed and code fell back to custom path.
+
+2) STT returns noise/echo: "Hmm hmm hmm"
+   Agent hears its own TTS (or room noise) and treats it as user speech.
+   Timeline:
+     08:09:08  USER: Hmm hmm hmm
+     08:09:18  ASSISTANT: आपको किस बारे में जानकारी चाहिए?
+     08:09:43  USER: Hmm hmm hmm   <-- ~25s later, again filler
+     08:09:55  ASSISTANT: अगर आपको किसी विशेष जानकारी...
+
+3) Continuous flow "stops" because:
+   - Real speech is not transcribed (only Hmm)
+   - LLM answers generically to filler
+   - Feels stuck / slow (2.5s endpointing + TTS latency)
+
+FIXES APPLIED IN CODE
+- Filter filler transcripts (hmm, uh, etc.) so they do not trigger replies
+- Log loudly if official Sarvam plugin is missing
+- Require: pip install "livekit-agents[sarvam]" livekit-plugins-sarvam
+
+USER ACTION
+1. pip install "livekit-agents[sarvam]" livekit-plugins-sarvam
+2. git pull && restart both terminals
+3. Confirm logs show:
+     STT = official Sarvam plugin
+     TTS = official Sarvam plugin
+4. Use headphones to reduce echo, or lower speaker volume
