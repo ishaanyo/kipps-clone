@@ -35,9 +35,14 @@ AICREDITS_KEY = os.getenv("AICREDITS_API_KEY") or os.getenv("OPENAI_API_KEY")
 STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "sarvam/saarika-v2")
 STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
-TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v2")
-TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "anushka")  # Sarvam: anushka|abhilash|manisha|vidya|arya|karun|hitesh; OpenAI: alloy
+
+# TTS note (Sep 2026):
+# AICredits OpenAI-compatible mapping for sarvam/bulbul-v2 currently ignores the
+# voice you pass and sends the old invalid speaker "meera". Until AICredits fixes
+# the mapping, we default to OpenAI TTS which works reliably through the gateway.
+TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "tts-1")          # reliable default
+TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1-hd")
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "alloy")          # OpenAI: alloy/echo/fable/onyx/nova/shimmer
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -91,22 +96,47 @@ def _make_llm():
 
 
 def _make_tts():
-    """Prefer Sarvam for Indian languages; fall back to OpenAI TTS."""
-    sarvam_voices = {"anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh"}
+    """
+    Create TTS via AICredits OpenAI-compatible gateway.
+
+    Note: sarvam/bulbul-v2 currently has a mapping bug on AICredits
+    (forces invalid speaker "meera"). Prefer openai/tts-1 or tts-1-hd.
+    """
     openai_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
 
-    for model in (TTS_MODEL, TTS_FALLBACK):
-        is_sarvam = "sarvam" in model.lower() or "bulbul" in model.lower()
-        voice = TTS_VOICE
-        if is_sarvam and voice not in sarvam_voices:
-            voice = "anushka"
-        if not is_sarvam and voice not in openai_voices:
-            voice = "alloy"
+    # Force a known-good OpenAI voice. Even if user sets a Sarvam name,
+    # we map it to a safe OpenAI voice so the request never fails.
+    voice = TTS_VOICE.lower().strip()
+    if voice not in openai_voices:
+        logger.warning(
+            f"TTS voice '{TTS_VOICE}' is not a supported OpenAI voice. "
+            f"Forcing 'alloy'. (AICredits Sarvam mapping is currently broken)"
+        )
+        voice = "alloy"
 
+    candidates = []
+    for m in (TTS_MODEL, TTS_FALLBACK, "tts-1", "tts-1-hd"):
+        m = (m or "").strip()
+        if not m:
+            continue
+        # Never try pure Sarvam models until AICredits fixes the speaker mapping
+        if "sarvam" in m.lower() or "bulbul" in m.lower():
+            logger.warning(
+                f"Skipping TTS model '{m}' — AICredits currently sends invalid "
+                f"speaker 'meera' for Sarvam models. Using OpenAI TTS instead."
+            )
+            continue
+        if m not in candidates:
+            candidates.append(m)
+
+    if not candidates:
+        candidates = ["tts-1"]
+
+    for model in candidates:
         kwargs = dict(model=model, voice=voice, api_key=AICREDITS_KEY)
         try:
             tts = openai.TTS(**kwargs, base_url=AICREDITS_BASE)
-            logger.info(f"TTS model={model} voice={voice}")
+            logger.info(f"TTS model={model} voice={voice} (via AICredits)")
             return tts
         except TypeError:
             try:
@@ -117,7 +147,8 @@ def _make_tts():
                 logger.warning(f"TTS {model} failed: {e}")
         except Exception as e:
             logger.warning(f"TTS {model} failed: {e}")
-    raise RuntimeError("No TTS model available")
+
+    raise RuntimeError("No working TTS model available via AICredits")
 
 
 def _build_session() -> AgentSession:
