@@ -61,28 +61,36 @@ Never invent rates. Always respond to the last user message.
 
 
 def _make_stt():
-    from src.aicredits_stt import AICreditsSTT
+    """Prefer official Sarvam plugin (multi-turn stable); else AICredits STT."""
+    sarvam_key = os.getenv("SARVAM_API_KEY")
+    if sarvam_key:
+        try:
+            from livekit.plugins import sarvam
+            # Non-realtime STT is widely available; good for multi-turn
+            try:
+                stt = sarvam.STT(
+                    language="hi-IN",
+                    model="saaras:v4",
+                    mode="codemix",
+                    high_vad_sensitivity=True,
+                )
+            except TypeError:
+                stt = sarvam.STT(language="hi-IN")
+            logger.info("STT = official Sarvam plugin (saaras)")
+            return stt
+        except Exception as e:
+            logger.warning(f"Official Sarvam STT unavailable: {e}")
 
-    # language=None → auto-detect (better for Hindi/English mix)
-    try:
-        stt = AICreditsSTT(
-            model=STT_MODEL,
-            language=None,
-            base_url=AICREDITS_BASE,
-            api_key=AICREDITS_KEY,
-            fallback_model=STT_FALLBACK,
-        )
-        logger.info(f"STT primary={STT_MODEL} fallback={STT_FALLBACK}")
-        return stt
-    except TypeError:
-        stt = AICreditsSTT(
-            model=STT_FALLBACK,
-            language=None,
-            base_url=AICREDITS_BASE,
-            api_key=AICREDITS_KEY,
-        )
-        logger.info(f"STT={STT_FALLBACK}")
-        return stt
+    from src.aicredits_stt import AICreditsSTT
+    stt = AICreditsSTT(
+        model=STT_MODEL,
+        language=None,
+        base_url=AICREDITS_BASE,
+        api_key=AICREDITS_KEY,
+        fallback_model=STT_FALLBACK,
+    )
+    logger.info(f"STT primary={STT_MODEL} fallback={STT_FALLBACK} (AICredits)")
+    return stt
 
 
 def _make_llm():
@@ -94,27 +102,44 @@ def _make_llm():
 
 
 def _make_tts():
-    """
-    Prefer native Sarvam API when SARVAM_API_KEY is set (correct speakers).
-    Falls back to AICredits OpenAI-compatible endpoint.
-    """
-    from src.aicredits_tts import AICreditsTTS
-
-    model = (TTS_MODEL or "sarvam/bulbul-v3").strip()
+    """Prefer official Sarvam TTS plugin; else custom AICredits TTS."""
+    sarvam_key = os.getenv("SARVAM_API_KEY")
     voice = (TTS_VOICE or "priya").strip().lower()
     lang = (TTS_LANG or "hi-IN").strip()
-    sarvam_key = os.getenv("SARVAM_API_KEY")
 
+    if sarvam_key:
+        try:
+            from livekit.plugins import sarvam
+            model = "bulbul:v3" if "v3" in (TTS_MODEL or "").lower() else "bulbul:v2"
+            try:
+                tts = sarvam.TTS(
+                    target_language_code=lang,
+                    model=model,
+                    speaker=voice,
+                    speech_sample_rate=22050,
+                    pace=1.0,
+                )
+            except TypeError:
+                tts = sarvam.TTS(
+                    target_language_code=lang,
+                    model=model,
+                    speaker=voice,
+                )
+            logger.info(f"TTS = official Sarvam plugin model={model} speaker={voice} lang={lang}")
+            return tts
+        except Exception as e:
+            logger.warning(f"Official Sarvam TTS unavailable: {e}")
+
+    from src.aicredits_tts import AICreditsTTS
     tts = AICreditsTTS(
-        model=model,
+        model=TTS_MODEL or "sarvam/bulbul-v3",
         voice=voice,
         base_url=AICREDITS_BASE,
         api_key=AICREDITS_KEY,
         sarvam_api_key=sarvam_key,
         language_code=lang,
     )
-    via = "native Sarvam" if sarvam_key else "AICredits"
-    logger.info(f"TTS model={model} voice={voice} lang={lang} ({via})")
+    logger.info(f"TTS model={TTS_MODEL} voice={voice} lang={lang} (custom fallback)")
     return tts
 
 
