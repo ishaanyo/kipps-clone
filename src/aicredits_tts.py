@@ -98,23 +98,13 @@ class _ChunkedStream(tts.ChunkedStream):
             return
 
         try:
-            from pydub import AudioSegment
             import numpy as np
-
-            bio = BytesIO(audio_bytes)
-            try:
-                seg = AudioSegment.from_file(bio)
-            except Exception:
-                bio.seek(0)
-                seg = AudioSegment.from_mp3(bio)
-            seg = (
-                seg.set_frame_rate(self._tts.sample_rate)
-                .set_channels(1)
-                .set_sample_width(2)
-            )
-            pcm = np.array(seg.get_array_of_samples(), dtype=np.int16)
+            pcm = self._decode_to_pcm(audio_bytes, self._tts.sample_rate)
+            if pcm is None or len(pcm) == 0:
+                logger.error("TTS audio decode produced empty PCM")
+                return
         except Exception as e:
-            logger.error(f"TTS audio decode failed (need pydub+ffmpeg): {e}")
+            logger.error(f"TTS audio decode failed: {e}")
             return
 
         output_emitter.initialize(
@@ -138,6 +128,70 @@ class _ChunkedStream(tts.ChunkedStream):
             output_emitter.push(frame)
 
         output_emitter.flush()
+
+
+    def _decode_to_pcm(self, audio_bytes: bytes, target_rate: int):
+        """Decode wav/mp3 to int16 mono PCM; prefer paths that need no ffmpeg."""
+        import numpy as np
+        from io import BytesIO
+
+        # 1) soundfile
+        try:
+            import soundfile as sf
+            data, rate = sf.read(BytesIO(audio_bytes), dtype="int16", always_2d=True)
+            mono = data.mean(axis=1).astype(np.int16) if data.shape[1] > 1 else data[:, 0]
+            if rate != target_rate and len(mono) > 0:
+                duration = len(mono) / float(rate)
+                new_len = max(1, int(duration * target_rate))
+                x_old = np.linspace(0, 1, num=len(mono), endpoint=False)
+                x_new = np.linspace(0, 1, num=new_len, endpoint=False)
+                mono = np.interp(x_new, x_old, mono.astype(np.float32)).astype(np.int16)
+            logger.info(f"Decoded via soundfile: {len(mono)} samples @ {target_rate}Hz")
+            return mono
+        except Exception as e:
+            logger.debug(f"soundfile decode: {e}")
+
+        # 2) stdlib wave
+        try:
+            import wave
+            with wave.open(BytesIO(audio_bytes), "rb") as wf:
+                channels = wf.getnchannels()
+                rate = wf.getframerate()
+                sw = wf.getsampwidth()
+                frames = wf.readframes(wf.getnframes())
+            if sw == 2:
+                pcm = np.frombuffer(frames, dtype=np.int16)
+            elif sw == 1:
+                pcm = (np.frombuffer(frames, dtype=np.uint8).astype(np.int16) - 128) * 256
+            else:
+                raise ValueError(f"unsupported sample width {sw}")
+            if channels > 1:
+                pcm = pcm.reshape(-1, channels).mean(axis=1).astype(np.int16)
+            if rate != target_rate and len(pcm) > 0:
+                duration = len(pcm) / float(rate)
+                new_len = max(1, int(duration * target_rate))
+                x_old = np.linspace(0, 1, num=len(pcm), endpoint=False)
+                x_new = np.linspace(0, 1, num=new_len, endpoint=False)
+                pcm = np.interp(x_new, x_old, pcm.astype(np.float32)).astype(np.int16)
+            logger.info(f"Decoded via wave: {len(pcm)} samples @ {target_rate}Hz")
+            return pcm
+        except Exception as e:
+            logger.debug(f"wave decode: {e}")
+
+        # 3) pydub (needs ffmpeg for mp3)
+        try:
+            from pydub import AudioSegment
+            seg = AudioSegment.from_file(BytesIO(audio_bytes))
+            seg = seg.set_frame_rate(target_rate).set_channels(1).set_sample_width(2)
+            pcm = np.array(seg.get_array_of_samples(), dtype=np.int16)
+            logger.info(f"Decoded via pydub: {len(pcm)} samples")
+            return pcm
+        except Exception as e:
+            logger.error(
+                "All audio decoders failed. Install ffmpeg OR ensure Sarvam returns WAV. "
+                f"Error: {e}"
+            )
+            return None
 
     def _synthesize_sync(self, text: str) -> bytes:
         if self._tts._sarvam_key:
