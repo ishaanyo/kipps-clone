@@ -37,7 +37,7 @@ STT_FALLBACK = os.getenv("LIVEKIT_STT_FALLBACK", "whisper-1")
 LLM_MODEL = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o-mini")  # solid Hindi/Hinglish
 TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "sarvam/bulbul-v2")
 TTS_FALLBACK = os.getenv("LIVEKIT_TTS_FALLBACK", "tts-1")
-TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "alloy")  # used for OpenAI TTS fallback
+TTS_VOICE = os.getenv("LIVEKIT_TTS_VOICE", "anushka")  # Sarvam: anushka|abhilash|manisha|vidya|arya|karun|hitesh; OpenAI: alloy
 
 INSTRUCTIONS = """
 You are SecureLoan Finance's live phone AI agent for India.
@@ -92,18 +92,26 @@ def _make_llm():
 
 def _make_tts():
     """Prefer Sarvam for Indian languages; fall back to OpenAI TTS."""
+    sarvam_voices = {"anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh"}
+    openai_voices = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+
     for model in (TTS_MODEL, TTS_FALLBACK):
-        kwargs = dict(model=model, api_key=AICREDITS_KEY)
-        if "tts-1" in model or model.startswith("openai"):
-            kwargs["voice"] = TTS_VOICE
+        is_sarvam = "sarvam" in model.lower() or "bulbul" in model.lower()
+        voice = TTS_VOICE
+        if is_sarvam and voice not in sarvam_voices:
+            voice = "anushka"
+        if not is_sarvam and voice not in openai_voices:
+            voice = "alloy"
+
+        kwargs = dict(model=model, voice=voice, api_key=AICREDITS_KEY)
         try:
             tts = openai.TTS(**kwargs, base_url=AICREDITS_BASE)
-            logger.info(f"TTS model={model}")
+            logger.info(f"TTS model={model} voice={voice}")
             return tts
         except TypeError:
             try:
                 tts = openai.TTS(**kwargs)
-                logger.info(f"TTS model={model} (no base_url kw)")
+                logger.info(f"TTS model={model} voice={voice} (no base_url)")
                 return tts
             except Exception as e:
                 logger.warning(f"TTS {model} failed: {e}")
