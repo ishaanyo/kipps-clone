@@ -1,12 +1,15 @@
 """
-Call demo server: serves UI + LiveKit join tokens.
+Multi-company Voice Agent SaaS server.
 
 Run:
     python -m src.call_server
-Then open http://127.0.0.1:8080
+Then open:
+    http://127.0.0.1:8080              → call widget
+    http://127.0.0.1:8080/dashboard    → SaaS dashboard
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import uuid
@@ -19,14 +22,19 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from src.livekit_token import create_participant_token, _env
+from src.saas.api import router as saas_router
+from src.saas.store import TenantStore
 
-app = FastAPI(title="SecureLoan LiveKit Call Demo")
+app = FastAPI(title="AI Voice Agent SaaS", version="0.2.0")
+app.include_router(saas_router)
 
 STATIC = Path(__file__).parent.parent / "static"
 STATIC.mkdir(exist_ok=True)
+store = TenantStore()
 
 
 @app.get("/")
@@ -37,6 +45,15 @@ def index():
     return FileResponse(page)
 
 
+@app.get("/dashboard")
+@app.get("/dashboard/")
+def dashboard():
+    page = STATIC / "dashboard" / "index.html"
+    if page.exists():
+        return FileResponse(page)
+    return HTMLResponse("<h1>Dashboard loading… open /api/saas/companies</h1>")
+
+
 @app.get("/api/health")
 def health():
     url = _env("LIVEKIT_URL")
@@ -44,24 +61,48 @@ def health():
     secret = _env("LIVEKIT_API_SECRET")
     return {
         "ok": True,
-        "livekit_url": url[:40] + "..." if len(url) > 40 else url,
-        "livekit_url_ok": url.startswith("wss://"),
-        "api_key_prefix": key[:8] + "..." if key else None,
-        "api_key_len": len(key),
-        "api_secret_len": len(secret),
+        "saas": True,
+        "companies": len(store.list_companies()),
+        "agents": len(store.list_agents()),
+        "livekit_url_ok": bool(url and url.startswith("wss://")),
+        "api_key_len": len(key or ""),
         "aicredits_set": bool(_env("AICREDITS_API_KEY")),
+        "sarvam_set": bool(_env("SARVAM_API_KEY")),
     }
 
 
 @app.post("/api/token")
 async def token(request: Request):
-    """Issue a LiveKit token for the browser participant."""
+    """
+    Issue LiveKit token. Body may include:
+      company_slug, agent_slug, room, identity
+    Room metadata carries tenant so the worker loads the right agent.
+    """
     try:
         payload = await request.json()
     except Exception:
         payload = {}
 
-    room = payload.get("room") or f"secureloan-{uuid.uuid4().hex[:8]}"
+    company_slug = (payload.get("company_slug") or "secureloan").strip().lower()
+    agent_slug = (payload.get("agent_slug") or "main").strip().lower()
+
+    resolved = store.resolve_for_call(company_slug, agent_slug)
+    if not resolved:
+        # fallback: still allow call with default room naming
+        company_name = company_slug
+        agent_id = ""
+        agent_name = "default"
+        greeting = "Hello! How can I help you?"
+    else:
+        co, ag = resolved
+        company_name = co.name
+        agent_id = ag.id
+        agent_name = ag.name
+        greeting = ag.config.greeting
+        company_slug = co.slug
+        agent_slug = ag.slug
+
+    room = payload.get("room") or f"{company_slug}-{uuid.uuid4().hex[:8]}"
     identity = payload.get("identity") or f"caller-{uuid.uuid4().hex[:6]}"
 
     url = _env("LIVEKIT_URL")
@@ -73,6 +114,7 @@ async def token(request: Request):
             detail=f"LIVEKIT_URL must start with wss:// (got: {url[:30]}...)",
         )
 
+    # Encode tenant in room name + return agent context to client
     try:
         jwt = create_participant_token(identity=identity, room_name=room)
     except Exception as e:
@@ -83,6 +125,18 @@ async def token(request: Request):
         "url": url,
         "room": room,
         "identity": identity,
+        "company_slug": company_slug,
+        "agent_slug": agent_slug,
+        "agent_id": agent_id,
+        "company_name": company_name,
+        "agent_name": agent_name,
+        "greeting": greeting,
+        # Worker reads this from job metadata if client passes it when creating room
+        "agent_context": {
+            "company_slug": company_slug,
+            "agent_slug": agent_slug,
+            "agent_id": agent_id,
+        },
     }
 
 
@@ -93,15 +147,15 @@ def main():
         print("Add them to .env then retry.")
         sys.exit(1)
 
-    url = _env("LIVEKIT_URL")
-    key = _env("LIVEKIT_API_KEY")
-    secret = _env("LIVEKIT_API_SECRET")
-    print("Call UI → http://127.0.0.1:8080")
-    print(f"LIVEKIT_URL = {url}")
-    print(f"API_KEY len = {len(key)}  prefix = {key[:10]}...")
-    print(f"API_SECRET len = {len(secret)}")
-    print("Also run:  python -m src.livekit_agent dev")
-    print("Health check:  http://127.0.0.1:8080/api/health")
+    print("══════════════════════════════════════════")
+    print("  AI Voice Agent SaaS (multi-company)")
+    print("══════════════════════════════════════════")
+    print("Call UI     → http://127.0.0.1:8080")
+    print("Dashboard   → http://127.0.0.1:8080/dashboard")
+    print("SaaS API    → http://127.0.0.1:8080/api/saas/companies")
+    print(f"Companies   → {len(store.list_companies())}  Agents → {len(store.list_agents())}")
+    print("Also run:    python -m src.livekit_agent dev")
+    print("══════════════════════════════════════════")
     uvicorn.run(app, host="127.0.0.1", port=8080)
 
 

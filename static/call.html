@@ -131,10 +131,13 @@
       try {
         setLive(false, 'Connecting…');
         log('Requesting token…');
+        const qs = new URLSearchParams(location.search);
+        const company = qs.get('company') || 'secureloan';
+        const agent = qs.get('agent') || 'main';
         const res = await fetch('/api/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ company_slug: company, agent_slug: agent }),
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();

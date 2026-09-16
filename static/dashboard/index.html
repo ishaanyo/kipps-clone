@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice Agent SaaS Dashboard</title>
+  <style>
+    :root { --bg:#0b1220; --card:#121a2b; --line:#1e2a44; --text:#e8eefc; --muted:#8b9bb8; --accent:#5b8cff; --ok:#3dd68c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:20px 28px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+    header h1 { margin:0; font-size:18px; letter-spacing:.3px; }
+    header a { color:var(--accent); text-decoration:none; font-size:14px; }
+    main { padding:24px 28px; max-width:1100px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+    .card h3 { margin:0 0 6px; font-size:16px; }
+    .card p { margin:0 0 10px; color:var(--muted); font-size:13px; line-height:1.4; }
+    .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; background:#1a2740; color:var(--ok); margin-right:6px; }
+    .btn { display:inline-block; margin-top:8px; padding:8px 12px; border-radius:8px; background:var(--accent); color:#fff; border:0; cursor:pointer; font-size:13px; text-decoration:none; }
+    .btn.secondary { background:transparent; border:1px solid var(--line); color:var(--text); }
+    .muted { color:var(--muted); font-size:12px; }
+    form { display:grid; gap:8px; margin-top:12px; }
+    input, select, textarea { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#0e1626; color:var(--text); }
+    label { font-size:12px; color:var(--muted); }
+    h2 { font-size:15px; margin:28px 0 12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Voice Agent SaaS</h1>
+    <div>
+      <a href="/">Call Widget</a>
+      &nbsp;·&nbsp;
+      <a href="/api/saas/companies">API</a>
+    </div>
+  </header>
+  <main>
+    <p class="muted">Multi-company voice agents — inspired by Kipps.AI. Each company has agents with their own prompt, voice, and knowledge.</p>
+    <h2>Companies</h2>
+    <div class="grid" id="companies">Loading…</div>
+
+    <h2>Create company</h2>
+    <div class="card" style="max-width:420px">
+      <form id="createCo">
+        <label>Name</label>
+        <input name="name" placeholder="Acme Loans" required />
+        <label>Slug (URL id)</label>
+        <input name="slug" placeholder="acme-loans" required />
+        <label>Email</label>
+        <input name="contact_email" type="email" placeholder="ops@acme.com" />
+        <label>Plan</label>
+        <select name="plan">
+          <option>starter</option>
+          <option>growth</option>
+          <option>enterprise</option>
+        </select>
+        <button class="btn" type="submit">Create company</button>
+      </form>
+    </div>
+  </main>
+  <script>
+    async function load() {
+      const res = await fetch('/api/saas/companies');
+      const companies = await res.json();
+      const root = document.getElementById('companies');
+      root.innerHTML = '';
+      for (const c of companies) {
+        const agentsRes = await fetch('/api/saas/companies/' + c.id + '/agents');
+        const agents = await agentsRes.json();
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `
+          <h3>${c.name}</h3>
+          <p>Slug: <code>${c.slug}</code> · Plan: ${c.plan}</p>
+          <span class="badge">${c.status}</span>
+          <span class="badge">${agents.length} agent(s)</span>
+          <div style="margin-top:10px">
+            ${(agents||[]).map(a => `
+              <div class="muted" style="margin:6px 0">${a.name} <code>/${a.slug}</code></div>
+              <a class="btn" href="/?company=${c.slug}&agent=${a.slug}">Test call</a>
+            `).join('') || '<p class="muted">No agents yet</p>'}
+          </div>
+        `;
+        root.appendChild(el);
+      }
+      if (!companies.length) root.innerHTML = '<p class="muted">No companies yet.</p>';
+    }
+    document.getElementById('createCo').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch('/api/saas/companies', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) { alert(await res.text()); return; }
+      const co = await res.json();
+      // default agent
+      await fetch('/api/saas/companies/' + co.id + '/agents', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ name: co.name + ' Agent', slug: 'main', config: {
+          greeting: 'Hello! Welcome to ' + co.name + '. How can I help?',
+          system_prompt: 'You are the voice agent for ' + co.name + '. Be helpful and concise.',
+          tts_voice: 'priya', language: 'hi-IN'
+        }})
+      });
+      e.target.reset();
+      load();
+    };
+    load();
+  </script>
+</body>
+</html>

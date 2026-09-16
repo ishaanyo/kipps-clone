@@ -178,6 +178,46 @@ def _build_session() -> AgentSession:
         return AgentSession(**kwargs)
 
 
+
+def _tenant_instructions(room_name: str) -> tuple[str, str, str]:
+    """
+    Resolve company agent from room name prefix: {company_slug}-{id}
+    Returns (instructions, greeting, tts_voice)
+    """
+    try:
+        from src.saas.store import TenantStore
+        store = TenantStore()
+        slug = (room_name or "").split("-")[0].lower()
+        resolved = store.resolve_for_call(slug, "main")
+        if not resolved:
+            # try full list match
+            for co in store.list_companies():
+                if co.slug in (room_name or "").lower():
+                    resolved = store.resolve_for_call(co.slug, "main")
+                    break
+        if not resolved:
+            return INSTRUCTIONS, "Hello! How can I help you?", TTS_VOICE
+        co, ag = resolved
+        cfg = ag.config
+        knowledge = (cfg.knowledge_text or "").strip()
+        instructions = (
+            f"You are '{ag.name}' for company '{co.name}'.\n"
+            f"{cfg.persona}\n\n"
+            f"{cfg.system_prompt}\n\n"
+        )
+        if knowledge:
+            instructions += f"=== KNOWLEDGE ===\n{knowledge}\n\n"
+        instructions += (
+            "LANGUAGE: reply in the same mix the caller uses "
+            "(Hindi / Hinglish / English). Keep answers short for speech."
+        )
+        logger.info(f"Tenant agent loaded: company={co.slug} agent={ag.slug} voice={cfg.tts_voice}")
+        return instructions, cfg.greeting, cfg.tts_voice or TTS_VOICE
+    except Exception as e:
+        logger.warning(f"Tenant resolve failed: {e}")
+        return INSTRUCTIONS, "Hello! How can I help you?", TTS_VOICE
+
+
 async def entrypoint(ctx: JobContext):
     # PLUGIN CHECK
     if os.getenv("SARVAM_API_KEY"):
@@ -193,8 +233,9 @@ async def entrypoint(ctx: JobContext):
     logger.info(f"Agent joining room: {ctx.room.name}")
     await ctx.connect()
 
+    instructions, greeting, _voice = _tenant_instructions(ctx.room.name)
     session = _build_session()
-    agent = Agent(instructions=INSTRUCTIONS)
+    agent = Agent(instructions=instructions)
     lead_store = LeadStore()
     transcript_parts: list[dict] = []
     saved = {"done": False}
@@ -266,9 +307,8 @@ async def entrypoint(ctx: JobContext):
 
     await session.generate_reply(
         instructions=(
-            "Caller se short friendly greeting Hinglish mein do — "
-            "jaise real call center. SecureLoan Finance welcome, "
-            "poocho kaunsa department chahiye. Sirf 2 short sentences."
+            f"Greet the caller using this line as a guide (paraphrase OK): {greeting!r}. "
+            "Keep it to 1-2 short spoken sentences. Then ask how you can help."
         )
     )
 
