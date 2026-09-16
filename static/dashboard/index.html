@@ -4,291 +4,149 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kipps Clone — Agent Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --sidebar: #f8f9fc;
-      --sidebar-border: #e8ebf2;
-      --sidebar-active: #eef2ff;
-      --sidebar-active-text: #4f46e5;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --card: #ffffff;
-      --accent: #4f46e5;
-      --accent2: #7c3aed;
-      --green: #059669;
-      --blue-banner: #1d4ed8;
-      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
-      --radius: 14px;
+      --sidebar: #f8f9fc; --sidebar-border: #e8ebf2; --sidebar-active: #eef2ff;
+      --sidebar-active-text: #4f46e5; --text: #111827; --muted: #6b7280;
+      --line: #e5e7eb; --accent: #4f46e5; --accent2: #7c3aed; --green: #059669;
+      --blue: #2563eb; --blue-banner: #1d4ed8; --radius: 14px;
+      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-      color: var(--text);
-      background: #fff;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Top bar */
-    .topbar {
-      height: 56px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      background: #fff;
-      position: sticky;
-      top: 0;
-      z-index: 20;
-    }
-    .topbar-left { display: flex; align-items: center; gap: 16px; }
-    .logo {
-      font-weight: 700;
-      font-size: 20px;
-      letter-spacing: -0.4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .logo span.mark {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
-      display: inline-flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 14px;
-    }
-    .org-select {
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-size: 13px;
-      color: var(--muted);
-      background: #fff;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    body { font-family: Inter, system-ui, sans-serif; color: var(--text); background: #fff; min-height: 100vh; display: flex; flex-direction: column; }
+    .topbar { height: 56px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; position: sticky; top: 0; z-index: 20; background: #fff; }
+    .topbar-left, .topbar-right { display: flex; align-items: center; gap: 14px; }
+    .logo { font-weight: 700; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+    .logo .mark { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg,#4f46e5,#7c3aed); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+    .org-select { border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
     .org-select .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
-    .topbar-right { display: flex; align-items: center; gap: 14px; font-size: 13px; }
-    .credits {
-      display: flex; align-items: center; gap: 6px;
-      background: #fff7ed; border: 1px solid #fed7aa;
-      padding: 6px 12px; border-radius: 20px; font-weight: 600; color: #c2410c;
-    }
-    .user-chip {
-      display: flex; align-items: center; gap: 8px;
-      padding: 4px 10px 4px 4px; border-radius: 20px; border: 1px solid var(--line);
-    }
-    .avatar {
-      width: 28px; height: 28px; border-radius: 50%;
-      background: linear-gradient(135deg,#6366f1,#a855f7);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 600;
-    }
-
-    /* Banner */
-    .banner {
-      background: var(--blue-banner);
-      color: #fff;
-      padding: 10px 20px;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .banner button {
-      background: #fff; color: var(--blue-banner);
-      border: 0; border-radius: 8px; padding: 6px 12px;
-      font-weight: 600; font-size: 12px; cursor: pointer;
-    }
-
-    /* Shell */
+    .credits { background: #fff7ed; border: 1px solid #fed7aa; padding: 6px 12px; border-radius: 20px; font-weight: 600; color: #c2410c; font-size: 13px; }
+    .user-chip { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 20px; border: 1px solid var(--line); font-size: 13px; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#a855f7); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+    .banner { background: var(--blue-banner); color: #fff; padding: 10px 20px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; }
+    .banner button { background: #fff; color: var(--blue-banner); border: 0; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 12px; cursor: pointer; }
     .shell { display: flex; flex: 1; min-height: 0; }
-    .sidebar {
-      width: 230px;
-      background: var(--sidebar);
-      border-right: 1px solid var(--sidebar-border);
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      color: var(--muted);
-      font-size: 13.5px;
-      font-weight: 500;
-      cursor: pointer;
-      text-decoration: none;
-      border: 0;
-      background: transparent;
-      width: 100%;
-      text-align: left;
-    }
+    .sidebar { width: 230px; background: var(--sidebar); border-right: 1px solid var(--sidebar-border); padding: 16px 12px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--muted); font-size: 13.5px; font-weight: 500; cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left; margin-bottom: 2px; font-family: inherit; }
     .nav-item:hover { background: #eef1f8; color: var(--text); }
-    .nav-item.active {
-      background: var(--sidebar-active);
-      color: var(--sidebar-active-text);
-    }
-    .nav-item .ico { width: 18px; text-align: center; font-size: 15px; }
-    .nav-section {
-      margin-top: 16px;
-      padding: 8px 12px 4px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #9ca3af;
-      font-weight: 600;
-    }
-    .content {
-      flex: 1;
-      overflow: auto;
-      padding: 28px 36px 48px;
-      background: #fff;
-    }
-
-    /* Empty state */
-    .empty {
-      max-width: 920px;
-      margin: 24px auto 0;
-      text-align: center;
-    }
-    .empty-icon {
-      width: 72px; height: 72px; margin: 0 auto 18px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #6366f1, #a855f7);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 32px; color: #fff;
-      box-shadow: 0 12px 30px rgba(99,102,241,.35);
-    }
+    .nav-item.active { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+    .nav-section { margin-top: 16px; padding: 8px 12px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; font-weight: 600; }
+    .content { flex: 1; overflow: auto; padding: 28px 36px 48px; }
+    .empty { max-width: 920px; margin: 24px auto 0; text-align: center; }
+    .empty-icon { width: 72px; height: 72px; margin: 0 auto 18px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#a855f7); display: flex; align-items: center; justify-content: center; font-size: 32px; color: #fff; box-shadow: 0 12px 30px rgba(99,102,241,.35); }
     .empty h1 { font-size: 26px; font-weight: 700; margin-bottom: 10px; }
-    .empty p { color: var(--muted); font-size: 14.5px; line-height: 1.55; max-width: 520px; margin: 0 auto 28px; }
-
-    .create-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      text-align: left;
-      margin-bottom: 28px;
-    }
-    @media (max-width: 900px) {
-      .create-grid { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-    }
-    .create-card {
-      border: 1.5px dashed #d1d5db;
-      border-radius: var(--radius);
-      padding: 22px 20px;
-      background: #fafbfc;
-      transition: .15s ease;
-      cursor: pointer;
-    }
-    .create-card:hover {
-      border-color: #a5b4fc;
-      background: #f5f3ff;
-      box-shadow: var(--shadow);
-    }
-    .create-card .icon-wrap {
-      width: 40px; height: 40px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; margin-bottom: 12px;
-    }
+    .empty > p { color: var(--muted); font-size: 14.5px; line-height: 1.55; max-width: 520px; margin: 0 auto 28px; }
+    .create-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; text-align: left; margin-bottom: 28px; }
+    @media (max-width: 900px) { .create-grid { grid-template-columns: 1fr; } .sidebar { display: none; } .train-layout { grid-template-columns: 1fr !important; } }
+    .create-card { border: 1.5px dashed #d1d5db; border-radius: var(--radius); padding: 22px 20px; background: #fafbfc; cursor: pointer; transition: .15s; }
+    .create-card:hover { border-color: #a5b4fc; background: #f5f3ff; box-shadow: var(--shadow); }
+    .create-card .icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px; }
     .create-card.chat .icon-wrap { background: #dbeafe; }
     .create-card.voice .icon-wrap { background: #ede9fe; }
     .create-card.wa .icon-wrap { background: #d1fae5; }
     .create-card h3 { font-size: 15px; margin-bottom: 6px; }
     .create-card p { font-size: 13px; color: var(--muted); line-height: 1.45; margin-bottom: 12px; }
-    .create-card a {
-      font-size: 13px; font-weight: 600; text-decoration: none;
-    }
-    .create-card.chat a { color: #2563eb; }
-    .create-card.voice a { color: #7c3aed; }
-    .create-card.wa a { color: #059669; }
-
-    .cta-row {
-      display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
-      margin-top: 8px;
-    }
-    .btn {
-      border: 0; border-radius: 10px; padding: 11px 18px;
-      font-size: 13.5px; font-weight: 600; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px;
-      font-family: inherit;
-    }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: #4338ca; }
-    .btn-outline {
-      background: #fff; color: var(--accent2);
-      border: 1.5px solid #ddd6fe;
-    }
+    .create-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
+    .create-card.chat a { color: #2563eb; } .create-card.voice a { color: #7c3aed; } .create-card.wa a { color: #059669; }
+    .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .btn { border: 0; border-radius: 10px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-outline { background: #fff; color: var(--accent2); border: 1.5px solid #ddd6fe; }
     .btn-outline.green { color: var(--green); border-color: #a7f3d0; }
     .btn-sm { padding: 7px 12px; font-size: 12.5px; }
-
-    /* Agent list */
-    .page-head {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 20px;
-    }
-    .page-head h2 { font-size: 20px; font-weight: 700; }
-    .agent-table {
-      width: 100%; border-collapse: collapse;
-      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
-    }
-    .agent-table th, .agent-table td {
-      text-align: left; padding: 12px 14px; font-size: 13px;
-      border-bottom: 1px solid var(--line);
-    }
-    .agent-table th { background: #f9fafb; color: var(--muted); font-weight: 600; }
-    .agent-table tr:last-child td { border-bottom: 0; }
-    .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 999px;
-      font-size: 11px; font-weight: 600;
-    }
-    .badge.active { background: #d1fae5; color: #065f46; }
-    .badge.draft { background: #f3f4f6; color: #4b5563; }
-
-    /* Modal */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(15,23,42,.45);
-      display: none; align-items: center; justify-content: center; z-index: 50;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal {
-      background: #fff; border-radius: 16px; width: min(480px, 92vw);
-      padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,.2);
-    }
-    .modal h3 { font-size: 18px; margin-bottom: 6px; }
-    .modal .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-    .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-    .field input, .field select, .field textarea {
-      width: 100%; border: 1px solid var(--line); border-radius: 8px;
-      padding: 9px 11px; font-size: 13.5px; font-family: inherit;
-    }
-    .field textarea { min-height: 80px; resize: vertical; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
     .btn-ghost { background: #f3f4f6; color: var(--text); }
-
-    .why {
-      margin-top: 36px;
-      background: linear-gradient(90deg, #eef2ff, #faf5ff);
-      border-radius: 16px;
-      padding: 22px;
-    }
-    .why h4 { text-align: center; margin-bottom: 16px; font-size: 15px; }
-    .why-grid {
-      display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; text-align: center;
-    }
-    .why-grid div { font-size: 13px; color: var(--muted); }
-    .why-grid strong { display: block; color: var(--text); margin-bottom: 4px; }
-
+    .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .page-head h2 { font-size: 20px; font-weight: 700; }
+    .agent-table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .agent-table th, .agent-table td { text-align: left; padding: 12px 14px; font-size: 13px; border-bottom: 1px solid var(--line); }
+    .agent-table th { background: #f9fafb; color: var(--muted); font-weight: 600; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .badge.active { background: #d1fae5; color: #065f46; }
     .hidden { display: none !important; }
+
+    /* Backdrop + modals */
+    .backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+    .backdrop.open { display: flex; }
+
+    /* Template picker (screen 1) */
+    .tpl-modal {
+      background: #fff; border-radius: 16px; width: min(860px, 96vw); height: min(560px, 90vh);
+      display: grid; grid-template-columns: 220px 1fr; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.2);
+    }
+    .tpl-left { border-right: 1px solid var(--line); padding: 20px 14px; background: #fafbfc; }
+    .tpl-left h4 { font-size: 13px; margin-bottom: 4px; }
+    .tpl-left .sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .tpl-cat { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; color: var(--muted); margin-bottom: 4px; }
+    .tpl-cat.active { background: #eef2ff; color: var(--accent); font-weight: 600; }
+    .tpl-cat .count { background: #e5e7eb; color: #374151; font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+    .tpl-cat.active .count { background: #c7d2fe; color: #3730a3; }
+    .tpl-right { display: flex; flex-direction: column; }
+    .tpl-right-head { padding: 18px 22px 10px; border-bottom: 1px solid var(--line); }
+    .tpl-right-head h3 { font-size: 18px; margin-bottom: 4px; }
+    .tpl-right-head .meta { font-size: 12px; color: var(--muted); }
+    .tpl-search { margin: 14px 22px 0; }
+    .tpl-search input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-family: inherit; }
+    .tpl-grid { padding: 18px 22px; flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; align-content: start; }
+    .tpl-card { border: 1.5px solid var(--line); border-radius: 12px; padding: 14px; cursor: pointer; transition: .15s; }
+    .tpl-card:hover { border-color: #a5b4fc; }
+    .tpl-card.selected { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    .tpl-card .preview { height: 90px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+    .tpl-card h5 { font-size: 13.5px; margin-bottom: 2px; }
+    .tpl-card .tag { font-size: 12px; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+    .radio { width: 16px; height: 16px; border: 2px solid #c7d2fe; border-radius: 50%; }
+    .tpl-card.selected .radio { border-color: var(--blue); background: radial-gradient(circle, var(--blue) 40%, #fff 45%); }
+    .tpl-footer { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .tpl-footer .sel { font-size: 13px; color: var(--muted); }
+    .tpl-footer .sel strong { color: var(--text); }
+    .tpl-footer .actions { display: flex; gap: 8px; }
+
+    /* Training screen (screen 2) */
+    .train-modal {
+      background: #f3f4f6; border-radius: 16px; width: min(1100px, 98vw); height: min(720px, 94vh);
+      display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.22);
+    }
+    .train-top {
+      background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .train-top .left { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .train-top .back { border: 0; background: transparent; cursor: pointer; font-size: 16px; }
+    .train-body { flex: 1; display: grid; grid-template-columns: 200px 1fr 320px; min-height: 0; }
+    .train-nav { background: #fff; border-right: 1px solid var(--line); padding: 12px; overflow: auto; }
+    .train-nav button {
+      width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 12px;
+      border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; font-family: inherit; margin-bottom: 2px;
+    }
+    .train-nav button.active { background: #eef2ff; color: var(--accent); font-weight: 600; }
+    .train-main { overflow: auto; padding: 20px 22px; }
+    .train-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .train-card h4 { font-size: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .train-card label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+    .train-card input, .train-card select, .train-card textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-family: inherit;
+    }
+    .train-card textarea { min-height: 160px; resize: vertical; line-height: 1.45; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .train-preview {
+      background: #fff; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0;
+    }
+    .preview-bar {
+      background: #0f172a; color: #fff; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600;
+    }
+    .preview-msgs { flex: 1; overflow: auto; padding: 16px; background: #f8fafc; }
+    .bubble { max-width: 85%; padding: 10px 12px; border-radius: 12px; font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+    .bubble.ai { background: #e5e7eb; color: #111; border-bottom-left-radius: 4px; }
+    .bubble.user { background: #4f46e5; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+    .preview-input {
+      border-top: 1px solid var(--line); padding: 10px; display: flex; gap: 8px; background: #fff;
+    }
+    .preview-input input { flex: 1; border: 1px solid var(--line); border-radius: 20px; padding: 10px 14px; font-size: 13px; font-family: inherit; }
+    .preview-input button { width: 38px; height: 38px; border-radius: 50%; border: 0; background: #0f172a; color: #fff; cursor: pointer; }
+    .preview-foot { text-align: center; font-size: 11px; color: var(--muted); padding: 6px; background: #fff; }
   </style>
 </head>
 <body>
@@ -298,15 +156,11 @@
       <div class="org-select"><span class="dot"></span> <span id="orgName">Personal workspace</span> ▾</div>
     </div>
     <div class="topbar-right">
-      <div class="credits">🪙 <span id="credits">100.00</span></div>
-      <span style="color:var(--muted)">Feedback</span>
-      <div class="user-chip">
-        <div class="avatar">KA</div>
-        <span>Kipps.AI</span> ▾
-      </div>
+      <div class="credits">🪙 <span>100.00</span></div>
+      <span style="color:var(--muted);font-size:13px">Feedback</span>
+      <div class="user-chip"><div class="avatar">KA</div> Kipps.AI ▾</div>
     </div>
   </header>
-
   <div class="banner">
     <span>🔔 Verify your phone number to unlock <strong>50 bonus credits</strong></span>
     <button type="button">Verify Now</button>
@@ -314,288 +168,373 @@
 
   <div class="shell">
     <aside class="sidebar">
-      <button class="nav-item active" data-page="agents"><span class="ico">👤</span> Agent</button>
-      <button class="nav-item" data-page="knowledge"><span class="ico">📚</span> Knowledge Base</button>
-      <button class="nav-item" data-page="provider"><span class="ico">🔑</span> Provider API Key</button>
-      <button class="nav-item" data-page="campaign"><span class="ico">📣</span> Campaign</button>
-      <button class="nav-item" data-page="inbox"><span class="ico">📥</span> Inbox</button>
-      <button class="nav-item" data-page="calls"><span class="ico">📞</span> Call Logs</button>
-      <button class="nav-item" data-page="contacts"><span class="ico">👥</span> Contacts</button>
-      <button class="nav-item" data-page="devs"><span class="ico">&lt;/&gt;</span> Developers</button>
-      <button class="nav-item" data-page="integration"><span class="ico">🔗</span> Integration</button>
-      <button class="nav-item" data-page="analytics"><span class="ico">📊</span> Analytics</button>
-      <button class="nav-item" data-page="phone"><span class="ico">📱</span> Phone Number</button>
+      <button class="nav-item active" data-page="agents"><span>👤</span> Agent</button>
+      <button class="nav-item" data-page="knowledge"><span>📚</span> Knowledge Base</button>
+      <button class="nav-item" data-page="provider"><span>🔑</span> Provider API Key</button>
+      <button class="nav-item" data-page="campaign"><span>📣</span> Campaign</button>
+      <button class="nav-item" data-page="inbox"><span>📥</span> Inbox</button>
+      <button class="nav-item" data-page="calls"><span>📞</span> Call Logs</button>
+      <button class="nav-item" data-page="contacts"><span>👥</span> Contacts</button>
+      <button class="nav-item" data-page="devs"><span>&lt;/&gt;</span> Developers</button>
+      <button class="nav-item" data-page="integration"><span>🔗</span> Integration</button>
+      <button class="nav-item" data-page="analytics"><span>📊</span> Analytics</button>
+      <button class="nav-item" data-page="phone"><span>📱</span> Phone Number</button>
       <div class="nav-section">Billing</div>
-      <button class="nav-item" data-page="billing"><span class="ico">💳</span> Billing</button>
+      <button class="nav-item" data-page="billing"><span>💳</span> Billing</button>
       <div class="nav-section">Organization</div>
-      <button class="nav-item" data-page="settings"><span class="ico">⚙️</span> Organization Settings</button>
+      <button class="nav-item" data-page="settings"><span>⚙️</span> Organization Settings</button>
     </aside>
 
     <main class="content">
-      <!-- Agents page -->
       <section id="page-agents">
         <div id="agentsEmpty" class="empty">
           <div class="empty-icon">🤖</div>
           <h1>No AI Agents Created Yet!</h1>
-          <p>Start building intelligent conversational experiences with our powerful AI agents. Create chatbots, voicebots, and WhatsApp agents to automate customer support, sales, and engagement.</p>
-
+          <p>Start building intelligent conversational experiences. Create chatbots, voicebots, and WhatsApp agents.</p>
           <div class="create-grid">
-            <div class="create-card chat" onclick="openCreate('chat')">
-              <div class="icon-wrap">💬</div>
-              <h3>Create Chatbot</h3>
-              <p>Build text-based conversational AI agents for websites, messaging platforms, and customer support.</p>
-              <a href="#">Get Started →</a>
-            </div>
-            <div class="create-card voice" onclick="openCreate('voice')">
-              <div class="icon-wrap">🎙️</div>
-              <h3>Create Voicebot</h3>
-              <p>Develop voice-enabled AI agents for phone systems, smart speakers, and voice interfaces.</p>
-              <a href="#">Get Started →</a>
-            </div>
-            <div class="create-card wa" onclick="openCreate('whatsapp')">
-              <div class="icon-wrap">💚</div>
-              <h3>Create WhatsApp Agent</h3>
-              <p>Build WhatsApp-enabled AI agents for direct messaging, customer support, and business communication.</p>
-              <a href="#">Get Started →</a>
-            </div>
+            <div class="create-card chat" onclick="startCreate('chat')"><div class="icon-wrap">💬</div><h3>Create Chatbot</h3><p>Text agents for websites and support.</p><a href="#">Get Started →</a></div>
+            <div class="create-card voice" onclick="startCreate('voice')"><div class="icon-wrap">🎙️</div><h3>Create Voicebot</h3><p>Voice agents for phone & browser calls.</p><a href="#">Get Started →</a></div>
+            <div class="create-card wa" onclick="startCreate('whatsapp')"><div class="icon-wrap">💚</div><h3>Create WhatsApp Agent</h3><p>WhatsApp messaging automation.</p><a href="#">Get Started →</a></div>
           </div>
-
           <div class="cta-row">
-            <button class="btn btn-primary" onclick="openCreate('chat')">💬 Create Your First Chatbot</button>
-            <button class="btn btn-outline" onclick="openCreate('voice')">🎙️ Create Your First Voicebot</button>
-            <button class="btn btn-outline green" onclick="openCreate('whatsapp')">💚 Create Your First WhatsApp Agent</button>
-          </div>
-
-          <div class="why">
-            <h4>Why Choose Kipps.AI?</h4>
-            <div class="why-grid">
-              <div><strong>⚡ Quick Setup</strong>Deploy in minutes</div>
-              <div><strong>📊 Analytics</strong>Track performance</div>
-              <div><strong>✨ AI-Powered</strong>Advanced NLP</div>
-            </div>
+            <button class="btn btn-primary" onclick="startCreate('chat')">💬 Create Your First Chatbot</button>
+            <button class="btn btn-outline" onclick="startCreate('voice')">🎙️ Create Your First Voicebot</button>
+            <button class="btn btn-outline green" onclick="startCreate('whatsapp')">💚 Create Your First WhatsApp Agent</button>
           </div>
         </div>
-
         <div id="agentsList" class="hidden">
           <div class="page-head">
             <h2>Agents</h2>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" onclick="openCreate('voice')">+ Voicebot</button>
-              <button class="btn btn-primary btn-sm" onclick="openCreate('chat')">+ Agent</button>
+              <button class="btn btn-outline btn-sm" onclick="startCreate('voice')">+ Voicebot</button>
+              <button class="btn btn-primary btn-sm" onclick="startCreate('chat')">+ Agent</button>
             </div>
           </div>
           <table class="agent-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Company</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Voice</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead><tr><th>Name</th><th>Company</th><th>Type</th><th>Status</th><th>Voice</th><th></th></tr></thead>
             <tbody id="agentRows"></tbody>
           </table>
         </div>
       </section>
-
-      <!-- Placeholder pages -->
-      <section id="page-knowledge" class="hidden">
-        <div class="page-head"><h2>Knowledge Base</h2><button class="btn btn-primary btn-sm">+ Add document</button></div>
-        <p style="color:var(--muted);font-size:14px">Upload FAQs, PDFs, and product docs your agents can use during calls.</p>
-      </section>
-      <section id="page-provider" class="hidden">
-        <div class="page-head"><h2>Provider API Key</h2></div>
-        <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Connect AICredits / Sarvam / LiveKit keys for your workspace.</p>
-        <div class="field"><label>AICredits API Key</label><input placeholder="sk-live-..." id="keyAicredits" /></div>
-        <div class="field"><label>Sarvam API Key</label><input placeholder="sk_..." id="keySarvam" /></div>
-        <button class="btn btn-primary btn-sm">Save keys</button>
-      </section>
-      <section id="page-campaign" class="hidden"><div class="page-head"><h2>Campaign</h2></div><p style="color:var(--muted)">Outbound call campaigns — coming soon.</p></section>
-      <section id="page-inbox" class="hidden"><div class="page-head"><h2>Inbox</h2></div><p style="color:var(--muted)">Unified inbox for chat & voice transcripts.</p></section>
-      <section id="page-calls" class="hidden"><div class="page-head"><h2>Call Logs</h2></div><p style="color:var(--muted)">Recent LiveKit sessions and lead captures appear here.</p></section>
-      <section id="page-contacts" class="hidden"><div class="page-head"><h2>Contacts</h2></div><p style="color:var(--muted)">CRM contacts collected from agents.</p></section>
-      <section id="page-devs" class="hidden">
-        <div class="page-head"><h2>Developers</h2></div>
-        <p style="color:var(--muted);margin-bottom:10px">REST API base: <code>/api/saas</code></p>
-        <pre style="background:#f9fafb;border:1px solid var(--line);padding:12px;border-radius:10px;font-size:12px;overflow:auto">GET  /api/saas/companies
-POST /api/saas/companies
-GET  /api/saas/companies/{id}/agents
+      <section id="page-knowledge" class="hidden"><div class="page-head"><h2>Knowledge Base</h2></div><p style="color:var(--muted)">Upload docs your agents can use.</p></section>
+      <section id="page-provider" class="hidden"><div class="page-head"><h2>Provider API Key</h2></div><p style="color:var(--muted)">AICredits / Sarvam / LiveKit keys.</p></section>
+      <section id="page-campaign" class="hidden"><div class="page-head"><h2>Campaign</h2></div><p style="color:var(--muted)">Outbound campaigns — soon.</p></section>
+      <section id="page-inbox" class="hidden"><div class="page-head"><h2>Inbox</h2></div><p style="color:var(--muted)">Unified inbox.</p></section>
+      <section id="page-calls" class="hidden"><div class="page-head"><h2>Call Logs</h2></div><p style="color:var(--muted)">Recent sessions.</p></section>
+      <section id="page-contacts" class="hidden"><div class="page-head"><h2>Contacts</h2></div><p style="color:var(--muted)">CRM contacts.</p></section>
+      <section id="page-devs" class="hidden"><div class="page-head"><h2>Developers</h2></div><pre style="background:#f9fafb;border:1px solid var(--line);padding:12px;border-radius:10px;font-size:12px">GET /api/saas/companies
 POST /api/saas/companies/{id}/agents
-GET  /api/saas/resolve/{company_slug}/{agent_slug}</pre>
-      </section>
-      <section id="page-integration" class="hidden"><div class="page-head"><h2>Integration</h2></div><p style="color:var(--muted)">Webhooks, CRM, calendars — coming soon.</p></section>
-      <section id="page-analytics" class="hidden"><div class="page-head"><h2>Analytics</h2></div><p style="color:var(--muted)">Call volume, containment rate, avg duration.</p></section>
-      <section id="page-phone" class="hidden"><div class="page-head"><h2>Phone Number</h2></div><p style="color:var(--muted)">Attach Twilio / Exotel numbers to voice agents.</p></section>
-      <section id="page-billing" class="hidden"><div class="page-head"><h2>Billing</h2></div><p style="color:var(--muted)">Plans: Starter · Growth · Enterprise. Credits shown in top bar.</p></section>
-      <section id="page-settings" class="hidden"><div class="page-head"><h2>Organization Settings</h2></div><p style="color:var(--muted)">Workspace name, members, and roles.</p></section>
+GET /api/saas/resolve/{company}/{agent}</pre></section>
+      <section id="page-integration" class="hidden"><div class="page-head"><h2>Integration</h2></div><p style="color:var(--muted)">Webhooks & CRM.</p></section>
+      <section id="page-analytics" class="hidden"><div class="page-head"><h2>Analytics</h2></div><p style="color:var(--muted)">Volume & containment.</p></section>
+      <section id="page-phone" class="hidden"><div class="page-head"><h2>Phone Number</h2></div><p style="color:var(--muted)">Twilio / Exotel numbers.</p></section>
+      <section id="page-billing" class="hidden"><div class="page-head"><h2>Billing</h2></div><p style="color:var(--muted)">Plans & credits.</p></section>
+      <section id="page-settings" class="hidden"><div class="page-head"><h2>Organization Settings</h2></div><p style="color:var(--muted)">Workspace & members.</p></section>
     </main>
   </div>
 
-  <!-- Create agent modal -->
-  <div class="modal-backdrop" id="modal">
-    <div class="modal">
-      <h3 id="modalTitle">Create Voicebot</h3>
-      <p class="sub" id="modalSub">Configure your agent and deploy in minutes.</p>
-      <div class="field">
-        <label>Company</label>
-        <select id="fCompany"></select>
+  <!-- SCREEN 1: Template picker -->
+  <div class="backdrop" id="tplBackdrop">
+    <div class="tpl-modal">
+      <div class="tpl-left">
+        <h4>Categories</h4>
+        <div class="sub">Filter templates by category</div>
+        <div class="tpl-cat active" data-cat="all">All Templates <span class="count">3</span></div>
+        <div class="tpl-cat" data-cat="blank">Blank <span class="count">1</span></div>
+        <div class="tpl-cat" data-cat="sales">Sales <span class="count">1</span></div>
+        <div class="tpl-cat" data-cat="support">Support <span class="count">1</span></div>
       </div>
-      <div class="field">
-        <label>Agent name</label>
-        <input id="fName" placeholder="Sales Voice Agent" />
-      </div>
-      <div class="field">
-        <label>Slug</label>
-        <input id="fSlug" placeholder="sales" />
-      </div>
-      <div class="field">
-        <label>Greeting</label>
-        <input id="fGreeting" placeholder="Hello! How can I help you today?" />
-      </div>
-      <div class="field">
-        <label>System prompt</label>
-        <textarea id="fPrompt" placeholder="You are a helpful voice agent for..."></textarea>
-      </div>
-      <div class="field">
-        <label>TTS voice (Sarvam)</label>
-        <select id="fVoice">
-          <option value="priya">priya</option>
-          <option value="ishita">ishita</option>
-          <option value="shubh">shubh</option>
-          <option value="anushka">anushka</option>
-        </select>
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary btn-sm" onclick="createAgent()">Create agent</button>
+      <div class="tpl-right">
+        <div class="tpl-right-head">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div>
+              <h3 id="tplTitle">Choose Chatbot Template</h3>
+              <div class="meta" id="tplMeta">3 templates available</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="closeTpl()" style="border-radius:8px">✕</button>
+          </div>
+        </div>
+        <div class="tpl-search"><input id="tplSearch" placeholder="Search templates by title or description..." oninput="renderTemplates()" /></div>
+        <div class="tpl-grid" id="tplGrid"></div>
+        <div class="tpl-footer">
+          <div class="sel">⭐ Template selected: <strong id="tplSelectedName">Blank</strong></div>
+          <div class="actions">
+            <button class="btn btn-ghost btn-sm" onclick="closeTpl()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="openTraining()">Create from Template</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    let companies = [];
-    let agents = [];
-    let createType = 'voice';
+  <!-- SCREEN 2: Training / settings -->
+  <div class="backdrop" id="trainBackdrop">
+    <div class="train-modal">
+      <div class="train-top">
+        <div class="left">
+          <button class="back" onclick="backToTpl()" title="Back">←</button>
+          <strong id="trainAgentTitle">New Agent</strong>
+          <span style="color:var(--muted)" id="trainTypeLabel">Chatbot</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="fCompany" style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px"></select>
+          <button class="btn btn-ghost btn-sm" onclick="closeTrain()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAgent()">Save & Create</button>
+        </div>
+      </div>
+      <div class="train-body">
+        <div class="train-nav">
+          <button class="active" data-tab="ai">AI</button>
+          <button data-tab="appearance">Appearance</button>
+          <button data-tab="leads">Leads</button>
+          <button data-tab="functions">Functions</button>
+          <button data-tab="embed">Embed</button>
+          <button data-tab="chats">Chats</button>
+          <button data-tab="integrations">Integrations</button>
+          <button data-tab="analytics">Analytics</button>
+        </div>
+        <div class="train-main">
+          <div class="train-card">
+            <h4>Knowledge Base <button class="btn btn-primary btn-sm" type="button">+ Add New</button></h4>
+            <input placeholder="Select Knowledge Bases" />
+            <div style="font-size:12px;color:var(--muted);margin-top:8px">Last Trained On: Not Trained Yet</div>
+          </div>
+          <div class="train-card">
+            <h4>Models</h4>
+            <label>Default Instructions</label>
+            <textarea id="fPrompt">You are an AI assistant who helps users with their inquiries, issues and requests. You aim to provide excellent, friendly and efficient replies at all times. Your role is to listen attentively to the user, understand their needs, and do your best to assist them.
 
-    const pages = ['agents','knowledge','provider','campaign','inbox','calls','contacts','devs','integration','analytics','phone','billing','settings'];
+Keep answers short and clear. If a question is not clear, ask clarifying questions. End replies with a positive note.
 
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const page = btn.dataset.page;
-        pages.forEach(p => {
-          const el = document.getElementById('page-' + p);
-          if (el) el.classList.toggle('hidden', p !== page);
-        });
-      });
+Limitations: Only use the knowledge provided. Don't make up answers. If something is outside the knowledge, say you don't know and offer to connect to a human.</textarea>
+            <div class="row2">
+              <div>
+                <label>Provider</label>
+                <select id="fProvider">
+                  <option value="aicredits">aicredits</option>
+                  <option value="openai">openai</option>
+                  <option value="gemini">gemini</option>
+                </select>
+              </div>
+              <div>
+                <label>Model</label>
+                <select id="fModel">
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                  <option value="gpt-4o">gpt-4o</option>
+                  <option value="gemini-flash">Gemini Flash</option>
+                </select>
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Agent name</label>
+                <input id="fName" placeholder="Support Agent" />
+              </div>
+              <div>
+                <label>Slug</label>
+                <input id="fSlug" placeholder="support" />
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Greeting</label>
+                <input id="fGreeting" value="Hi! How can I help you?" oninput="syncPreview()" />
+              </div>
+              <div>
+                <label>TTS voice (voicebots)</label>
+                <select id="fVoice">
+                  <option value="priya">priya</option>
+                  <option value="ishita">ishita</option>
+                  <option value="shubh">shubh</option>
+                  <option value="anushka">anushka</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="train-preview">
+          <div class="preview-bar">
+            <span id="previewBrand">Kipps.AI</span>
+            <span style="opacity:.7;cursor:pointer" onclick="syncPreview()">↻</span>
+          </div>
+          <div class="preview-msgs" id="previewMsgs">
+            <div class="bubble ai" id="previewGreeting">Hi! How can I help you?</div>
+          </div>
+          <div class="preview-input">
+            <input id="previewIn" placeholder="Type your message here..." onkeydown="if(event.key==='Enter')previewSend()" />
+            <button type="button" onclick="previewSend()">➤</button>
+          </div>
+          <div class="preview-foot">Powered By Kipps.AI</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const TEMPLATES = [
+  { id: 'blank', cat: 'blank', title: 'Blank Chatbot', desc: 'Customizable', prompt: 'You are a helpful AI assistant. Keep replies short and friendly.' },
+  { id: 'sales', cat: 'sales', title: 'Sales Qualifier', desc: 'Lead qualification', prompt: 'You are a sales qualification agent. Ask about budget, timeline, and need. Offer to book a demo.' },
+  { id: 'support', cat: 'support', title: 'Support Desk', desc: 'Customer support', prompt: 'You are a customer support agent. Help with issues, order status, and FAQs. Escalate to human when needed.' },
+];
+let createType = 'chat';
+let selectedTpl = TEMPLATES[0];
+let activeCat = 'all';
+let companies = [];
+let agents = [];
+
+const pages = ['agents','knowledge','provider','campaign','inbox','calls','contacts','devs','integration','analytics','phone','billing','settings'];
+document.querySelectorAll('.sidebar .nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar .nav-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const page = btn.dataset.page;
+    pages.forEach(p => {
+      const el = document.getElementById('page-' + p);
+      if (el) el.classList.toggle('hidden', p !== page);
     });
+  });
+});
 
-    function openCreate(type) {
-      createType = type;
-      document.getElementById('modalTitle').textContent =
-        type === 'voice' ? 'Create Voicebot' :
-        type === 'whatsapp' ? 'Create WhatsApp Agent' : 'Create Chatbot';
-      document.getElementById('modalSub').textContent =
-        type === 'voice'
-          ? 'Voice-enabled agent for browser & phone calls via LiveKit.'
-          : 'Agent will be stored in your workspace (channel wiring next).';
-      document.getElementById('modal').classList.add('open');
+function startCreate(type) {
+  createType = type;
+  const label = type === 'voice' ? 'Voicebot' : type === 'whatsapp' ? 'WhatsApp Agent' : 'Chatbot';
+  document.getElementById('tplTitle').textContent = 'Choose ' + label + ' Template';
+  document.getElementById('trainTypeLabel').textContent = label;
+  selectedTpl = TEMPLATES[0];
+  activeCat = 'all';
+  document.querySelectorAll('.tpl-cat').forEach(c => c.classList.toggle('active', c.dataset.cat === 'all'));
+  renderTemplates();
+  document.getElementById('tplBackdrop').classList.add('open');
+}
+function closeTpl() { document.getElementById('tplBackdrop').classList.remove('open'); }
+function closeTrain() { document.getElementById('trainBackdrop').classList.remove('open'); }
+function backToTpl() {
+  closeTrain();
+  document.getElementById('tplBackdrop').classList.add('open');
+}
+
+document.querySelectorAll('.tpl-cat').forEach(c => {
+  c.addEventListener('click', () => {
+    activeCat = c.dataset.cat;
+    document.querySelectorAll('.tpl-cat').forEach(x => x.classList.toggle('active', x === c));
+    renderTemplates();
+  });
+});
+
+function renderTemplates() {
+  const q = (document.getElementById('tplSearch').value || '').toLowerCase();
+  const list = TEMPLATES.filter(t => (activeCat === 'all' || t.cat === activeCat) && (!q || t.title.toLowerCase().includes(q)));
+  document.getElementById('tplMeta').textContent = list.length + ' templates available';
+  document.getElementById('tplGrid').innerHTML = list.map(t => `
+    <div class="tpl-card ${selectedTpl.id === t.id ? 'selected' : ''}" onclick="selectTpl('${t.id}')">
+      <div class="preview">📄 ${t.title}</div>
+      <h5>${t.title}</h5>
+      <div class="tag"><span>${t.desc}</span><span class="radio"></span></div>
+    </div>
+  `).join('');
+  document.getElementById('tplSelectedName').textContent = selectedTpl.title;
+}
+function selectTpl(id) {
+  selectedTpl = TEMPLATES.find(t => t.id === id) || TEMPLATES[0];
+  renderTemplates();
+}
+
+function openTraining() {
+  closeTpl();
+  document.getElementById('fPrompt').value = selectedTpl.prompt;
+  document.getElementById('fName').value = selectedTpl.title;
+  document.getElementById('fSlug').value = selectedTpl.id;
+  document.getElementById('fGreeting').value = 'Hi! How can I help you?';
+  document.getElementById('trainAgentTitle').textContent = selectedTpl.title;
+  syncPreview();
+  document.getElementById('trainBackdrop').classList.add('open');
+}
+function syncPreview() {
+  const g = document.getElementById('fGreeting').value || 'Hi! How can I help you?';
+  document.getElementById('previewGreeting').textContent = g;
+  document.getElementById('previewBrand').textContent = document.getElementById('fName').value || 'Kipps.AI';
+}
+function previewSend() {
+  const input = document.getElementById('previewIn');
+  const text = (input.value || '').trim();
+  if (!text) return;
+  const box = document.getElementById('previewMsgs');
+  box.insertAdjacentHTML('beforeend', `<div class="bubble user">${text.replace(/</g,'&lt;')}</div>`);
+  input.value = '';
+  setTimeout(() => {
+    box.insertAdjacentHTML('beforeend', `<div class="bubble ai">Thanks! (Preview only — connect LLM to go live.)</div>`);
+    box.scrollTop = box.scrollHeight;
+  }, 400);
+}
+
+async function load() {
+  const res = await fetch('/api/saas/companies');
+  companies = await res.json();
+  agents = [];
+  for (const c of companies) {
+    const ar = await fetch('/api/saas/companies/' + c.id + '/agents');
+    const list = await ar.json();
+    list.forEach(a => agents.push({ ...a, company_name: c.name, company_slug: c.slug }));
+  }
+  const sel = document.getElementById('fCompany');
+  sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('') || '<option value="">New company on save</option>';
+  if (companies[0]) document.getElementById('orgName').textContent = companies[0].name;
+
+  const empty = document.getElementById('agentsEmpty');
+  const list = document.getElementById('agentsList');
+  if (!agents.length) { empty.classList.remove('hidden'); list.classList.add('hidden'); }
+  else {
+    empty.classList.add('hidden'); list.classList.remove('hidden');
+    document.getElementById('agentRows').innerHTML = agents.map(a => `
+      <tr>
+        <td><strong>${a.name}</strong><div style="color:#6b7280;font-size:12px">${a.slug}</div></td>
+        <td>${a.company_name || ''}</td>
+        <td>Voice/Chat</td>
+        <td><span class="badge active">${a.status}</span></td>
+        <td>${(a.config && a.config.tts_voice) || 'priya'}</td>
+        <td><a class="btn btn-outline btn-sm" href="/?company=${a.company_slug}&agent=${a.slug}">Test call</a></td>
+      </tr>`).join('');
+  }
+}
+
+async function saveAgent() {
+  let companyId = document.getElementById('fCompany').value;
+  if (!companyId) {
+    const name = prompt('Company name?', 'My Company');
+    if (!name) return;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const cr = await fetch('/api/saas/companies', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, slug, plan: 'starter' })
+    });
+    if (!cr.ok) { alert(await cr.text()); return; }
+    companyId = (await cr.json()).id;
+  }
+  const name = document.getElementById('fName').value || selectedTpl.title;
+  const slug = (document.getElementById('fSlug').value || name).toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  const body = {
+    name, slug,
+    description: createType + ' · ' + selectedTpl.title,
+    config: {
+      greeting: document.getElementById('fGreeting').value,
+      system_prompt: document.getElementById('fPrompt').value,
+      tts_voice: document.getElementById('fVoice').value,
+      llm_model: document.getElementById('fModel').value,
+      language: 'hi-IN',
+      persona: selectedTpl.title + ' agent'
     }
-    function closeModal() {
-      document.getElementById('modal').classList.remove('open');
-    }
+  };
+  const res = await fetch('/api/saas/companies/' + companyId + '/agents', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { alert(await res.text()); return; }
+  closeTrain();
+  await load();
+}
 
-    async function load() {
-      const res = await fetch('/api/saas/companies');
-      companies = await res.json();
-      agents = [];
-      for (const c of companies) {
-        const ar = await fetch('/api/saas/companies/' + c.id + '/agents');
-        const list = await ar.json();
-        list.forEach(a => agents.push({ ...a, company_name: c.name, company_slug: c.slug }));
-      }
-      const sel = document.getElementById('fCompany');
-      sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
-        || '<option value="">Create a company first</option>';
-      if (companies[0]) document.getElementById('orgName').textContent = companies[0].name;
-
-      const empty = document.getElementById('agentsEmpty');
-      const list = document.getElementById('agentsList');
-      if (!agents.length) {
-        empty.classList.remove('hidden');
-        list.classList.add('hidden');
-      } else {
-        empty.classList.add('hidden');
-        list.classList.remove('hidden');
-        const rows = document.getElementById('agentRows');
-        rows.innerHTML = agents.map(a => `
-          <tr>
-            <td><strong>${a.name}</strong><div style="color:#6b7280;font-size:12px">${a.slug}</div></td>
-            <td>${a.company_name || ''}</td>
-            <td>Voice</td>
-            <td><span class="badge ${a.status === 'active' ? 'active' : 'draft'}">${a.status}</span></td>
-            <td>${(a.config && a.config.tts_voice) || 'priya'}</td>
-            <td>
-              <a class="btn btn-outline btn-sm" href="/?company=${a.company_slug}&agent=${a.slug}">Test call</a>
-            </td>
-          </tr>
-        `).join('');
-      }
-    }
-
-    async function createAgent() {
-      const companyId = document.getElementById('fCompany').value;
-      if (!companyId) {
-        // create default company
-        const name = prompt('Company name?', 'My Company');
-        if (!name) return;
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const cr = await fetch('/api/saas/companies', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, slug, plan: 'starter' })
-        });
-        if (!cr.ok) { alert(await cr.text()); return; }
-        const co = await cr.json();
-        await finishCreate(co.id);
-        return;
-      }
-      await finishCreate(companyId);
-    }
-
-    async function finishCreate(companyId) {
-      const name = document.getElementById('fName').value || 'New Agent';
-      const slug = (document.getElementById('fSlug').value || name).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const body = {
-        name,
-        slug,
-        description: createType + ' agent',
-        config: {
-          greeting: document.getElementById('fGreeting').value || 'Hello! How can I help you?',
-          system_prompt: document.getElementById('fPrompt').value || ('You are a helpful ' + createType + ' agent. Keep answers short.'),
-          tts_voice: document.getElementById('fVoice').value || 'priya',
-          language: 'hi-IN',
-          persona: 'Professional, friendly AI agent.'
-        }
-      };
-      const res = await fetch('/api/saas/companies/' + companyId + '/agents', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) { alert(await res.text()); return; }
-      closeModal();
-      await load();
-      // jump to agents list
-      document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === 'agents'));
-      pages.forEach(p => {
-        const el = document.getElementById('page-' + p);
-        if (el) el.classList.toggle('hidden', p !== 'agents');
-      });
-    }
-
-    load();
-  </script>
+renderTemplates();
+load();
+</script>
 </body>
 </html>

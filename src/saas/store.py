@@ -20,8 +20,15 @@ from .models import (
 
 class TenantStore:
     def __init__(self, path: str | Path | None = None):
+        import os
         root = Path(__file__).resolve().parents[2]
-        self.path = Path(path) if path else root / "data" / "tenants.json"
+        env_path = os.getenv("TENANT_STORE_PATH")
+        if path:
+            self.path = Path(path)
+        elif env_path:
+            self.path = Path(env_path)
+        else:
+            self.path = root / "data" / "tenants.json"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
         self._data: dict[str, Any] = {"companies": {}, "agents": {}}
