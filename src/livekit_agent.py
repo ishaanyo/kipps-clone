@@ -68,24 +68,35 @@ def _make_stt():
     3) Custom AICreditsSTT last
     """
     # 1) Whisper through LiveKit openai plugin (stable multi-turn)
+    # Prefer interim_results when supported for lower perceived latency
     try:
         stt = openai.STT(
             model="whisper-1",
             language="hi",
             base_url=AICREDITS_BASE,
             api_key=AICREDITS_KEY,
+            detect_language=False,
         )
         logger.info("STT = LiveKit openai.STT whisper-1 via AICredits (multi-turn)")
         return stt
     except TypeError:
         try:
-            stt = openai.STT(model="whisper-1", language="hi", api_key=AICREDITS_KEY)
-            # point OpenAI client at AICredits via env
-            os.environ.setdefault("OPENAI_BASE_URL", AICREDITS_BASE)
-            logger.info("STT = LiveKit openai.STT whisper-1 (env base)")
+            stt = openai.STT(
+                model="whisper-1",
+                language="hi",
+                base_url=AICREDITS_BASE,
+                api_key=AICREDITS_KEY,
+            )
+            logger.info("STT = LiveKit openai.STT whisper-1 via AICredits")
             return stt
-        except Exception as e:
-            logger.warning(f"openai.STT failed: {e}")
+        except TypeError:
+            try:
+                stt = openai.STT(model="whisper-1", language="hi", api_key=AICREDITS_KEY)
+                os.environ.setdefault("OPENAI_BASE_URL", AICREDITS_BASE)
+                logger.info("STT = LiveKit openai.STT whisper-1 (env base)")
+                return stt
+            except Exception as e:
+                logger.warning(f"openai.STT failed: {e}")
     except Exception as e:
         logger.warning(f"openai.STT failed: {e}")
 
@@ -116,11 +127,22 @@ def _make_stt():
 
 
 def _make_llm():
-    kwargs = dict(model=LLM_MODEL, api_key=AICREDITS_KEY, temperature=0.55)
+    # Lower max tokens + slight temp for faster first-token on short spoken replies
+    kwargs = dict(
+        model=LLM_MODEL,
+        api_key=AICREDITS_KEY,
+        temperature=0.4,
+        max_completion_tokens=180,
+    )
     try:
         return openai.LLM(**kwargs, base_url=AICREDITS_BASE)
     except TypeError:
-        return openai.LLM(**kwargs)
+        try:
+            kwargs.pop("max_completion_tokens", None)
+            kwargs["max_tokens"] = 180
+            return openai.LLM(**kwargs, base_url=AICREDITS_BASE)
+        except TypeError:
+            return openai.LLM(model=LLM_MODEL, api_key=AICREDITS_KEY, temperature=0.4)
 
 
 def _make_tts():
@@ -170,12 +192,50 @@ def _make_tts():
 def _build_session() -> AgentSession:
     if not AICREDITS_KEY and not os.getenv("SARVAM_API_KEY"):
         raise RuntimeError("AICREDITS_API_KEY or SARVAM_API_KEY required")
-    vad = silero.VAD.load()
-    kwargs = dict(stt=_make_stt(), llm=_make_llm(), tts=_make_tts(), vad=vad)
+    # Aggressive VAD for faster end-of-speech detection (trade-off: more false cuts on noisy lines)
     try:
-        return AgentSession(**kwargs, allow_interruptions=True, min_endpointing_delay=0.8)
+        vad = silero.VAD.load(
+            min_speech_duration=0.05,
+            min_silence_duration=0.35,
+            prefix_padding_duration=0.2,
+            activation_threshold=0.45,
+        )
     except TypeError:
-        return AgentSession(**kwargs)
+        try:
+            vad = silero.VAD.load(min_silence_duration=0.35)
+        except TypeError:
+            vad = silero.VAD.load()
+
+    kwargs = dict(stt=_make_stt(), llm=_make_llm(), tts=_make_tts(), vad=vad)
+
+    # Latency-tuned session options (compatible with older + newer livekit-agents)
+    # min_endpointing_delay: lower = snappier replies (was 0.8 → 0.3)
+    # preemptive_generation: start LLM before turn fully confirmed
+    extra = dict(
+        allow_interruptions=True,
+        min_endpointing_delay=0.3,
+        max_endpointing_delay=2.0,
+        min_interruption_duration=0.25,
+    )
+    try:
+        # Newer SDKs
+        return AgentSession(
+            **kwargs,
+            **extra,
+            preemptive_generation=True,
+        )
+    except TypeError:
+        try:
+            return AgentSession(**kwargs, **extra)
+        except TypeError:
+            try:
+                return AgentSession(
+                    **kwargs,
+                    allow_interruptions=True,
+                    min_endpointing_delay=0.3,
+                )
+            except TypeError:
+                return AgentSession(**kwargs)
 
 
 

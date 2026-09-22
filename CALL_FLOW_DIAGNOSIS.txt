@@ -37,3 +37,15 @@ USER ACTION
      STT = official Sarvam plugin
      TTS = official Sarvam plugin
 4. Use headphones to reduce echo, or lower speaker volume
+
+LATENCY FIXES (2026-09-22)
+==========================
+- min_endpointing_delay: 0.8s → 0.3s (faster turn commit after silence)
+- max_endpointing_delay: 2.0s
+- Silero VAD: min_silence_duration=0.35s, lower activation threshold
+- min_interruption_duration: 0.25s (snappier barge-in)
+- preemptive_generation=True when SDK supports it (LLM starts early)
+- Still prefer LiveKit openai.STT (Whisper) + official Sarvam TTS when available
+
+Expected: response starts ~0.5–1s sooner after user stops speaking.
+If agent cuts off mid-sentence, raise min_endpointing_delay to 0.45–0.5.
